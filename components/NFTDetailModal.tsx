@@ -3,8 +3,6 @@
 import { useEffect, useState } from 'react';
 import { BLOCK_EXPLORER, CONTRACT_ADDRESS, COLLECTION_NAME } from '@/lib/constants';
 
-const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
-
 interface Attribute {
   trait_type: string;
   value: string | number;
@@ -69,6 +67,11 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
 
   if (!isOpen) return null;
 
+  // Filter out traits with "none" value
+  const displayAttributes = attributes.filter(
+    attr => String(attr.value).toLowerCase() !== 'none'
+  );
+
   const handleDownloadImage = () => {
     const link = document.createElement('a');
     link.href = `/api/image/${tokenId}`;
@@ -119,14 +122,14 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
         </svg>
       </button>
 
-      {/* Modal Content */}
+      {/* Modal Content - Wider: max-w-6xl */}
       <div 
-        className="bg-tmk-gray-900 rounded-2xl overflow-hidden max-w-4xl w-full max-h-[90vh] overflow-y-auto
+        className="bg-tmk-gray-900 rounded-2xl overflow-hidden max-w-6xl w-full max-h-[90vh] overflow-y-auto
                    flex flex-col lg:flex-row shadow-2xl border border-tmk-gray-800"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left Side - Image */}
-        <div className="lg:w-1/2 bg-tmk-dark p-4 flex flex-col">
+        {/* Left Side - Image + All Action Buttons */}
+        <div className="lg:w-2/5 bg-tmk-dark p-4 flex flex-col">
           <div className="relative aspect-square rounded-xl overflow-hidden bg-tmk-gray-800">
             <img
               src={imageUrl}
@@ -135,23 +138,56 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
             />
           </div>
           
-          {/* Save Image Button - Desktop */}
-          <button
-            onClick={handleDownloadImage}
-            className="hidden lg:flex mt-4 items-center justify-center gap-2 px-4 py-3
-                       bg-tmk-gray-800 hover:bg-tmk-gray-700 text-white
-                       font-medium rounded-xl transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Save Image
-          </button>
+          {/* All Action Buttons - Under Image */}
+          <div className="mt-4 space-y-2">
+            {/* Save Image Button */}
+            <button
+              onClick={handleDownloadImage}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3
+                         bg-tmk-gray-800 hover:bg-tmk-gray-700 text-white
+                         font-medium rounded-xl transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Save Image
+            </button>
+
+            {/* Download 3D Button */}
+            <button
+              onClick={handleDownload3D}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3
+                         bg-tmk-red hover:bg-tmk-red-hover text-white
+                         font-semibold rounded-xl transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download 3D File
+            </button>
+
+            {/* View on Explorer Button */}
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3
+                         bg-tmk-gray-800 hover:bg-tmk-gray-700 text-white
+                         font-medium rounded-xl transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              View on Explorer
+            </a>
+          </div>
         </div>
 
-        {/* Right Side - Details */}
-        <div className="lg:w-1/2 p-6 flex flex-col">
+        {/* Right Side - Header + Traits Only */}
+        <div className="lg:w-3/5 p-6 flex flex-col">
           {/* Header */}
           <div className="mb-6">
             <p className="text-tmk-gray-400 text-sm uppercase tracking-wider mb-1">
@@ -173,28 +209,28 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
             </h3>
 
             {isLoading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-tmk-gray-800 rounded-xl p-4 animate-pulse">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="bg-tmk-gray-800 rounded-xl p-3 animate-pulse">
                     <div className="h-3 bg-tmk-gray-700 rounded w-1/2 mb-2"></div>
-                    <div className="h-5 bg-tmk-gray-700 rounded w-3/4"></div>
+                    <div className="h-4 bg-tmk-gray-700 rounded w-3/4"></div>
                   </div>
                 ))}
               </div>
             ) : error ? (
               <p className="text-tmk-gray-400 text-sm">{error}</p>
-            ) : attributes.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {attributes.map((attr, index) => (
+            ) : displayAttributes.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {displayAttributes.map((attr, index) => (
                   <div 
                     key={index}
-                    className="bg-tmk-gray-800 border border-tmk-gray-700 rounded-xl p-4
+                    className="bg-tmk-gray-800 border border-tmk-gray-700 rounded-xl p-3
                                hover:border-tmk-red/30 transition-colors"
                   >
                     <p className="text-tmk-gray-400 text-xs uppercase tracking-wider mb-1">
                       {attr.trait_type}
                     </p>
-                    <p className="text-white font-medium truncate" title={String(attr.value)}>
+                    <p className="text-white font-medium text-sm truncate" title={String(attr.value)}>
                       {attr.value}
                     </p>
                   </div>
@@ -203,55 +239,6 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
             ) : (
               <p className="text-tmk-gray-400 text-sm">No traits available</p>
             )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mt-6 space-y-3">
-            {/* Download 3D Button */}
-            <button
-              onClick={handleDownload3D}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3
-                         bg-tmk-red hover:bg-tmk-red-hover text-white
-                         font-semibold rounded-xl transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download 3D File
-            </button>
-
-            {/* Bottom Row - Mobile Save Image + Explorer */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleDownloadImage}
-                className="lg:hidden flex-1 flex items-center justify-center gap-2 px-4 py-3
-                           bg-tmk-gray-800 hover:bg-tmk-gray-700 text-white
-                           font-medium rounded-xl transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Save Image
-              </button>
-
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-4 py-3
-                           bg-tmk-gray-800 hover:bg-tmk-gray-700 text-white
-                           font-medium rounded-xl transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                <span className="lg:hidden">Explorer</span>
-                <span className="hidden lg:inline">View on Explorer</span>
-              </a>
-            </div>
           </div>
         </div>
       </div>
