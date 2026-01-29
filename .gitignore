@@ -26,6 +26,10 @@ yarn-error.log*
 # Local env files
 .env*.local
 
+# Upload script progress files
+scripts/upload-progress.json
+scripts/failed-tokens.json
+
 # Vercel
 .vercel
 

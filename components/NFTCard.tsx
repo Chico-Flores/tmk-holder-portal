@@ -7,6 +7,9 @@ import { BLOCK_EXPLORER, CONTRACT_ADDRESS } from '@/lib/constants';
 import { getIpfsUrls } from '@/lib/utils';
 import { ImageModal } from './ImageModal';
 
+// R2 public URL for images (set in Vercel env vars)
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+
 interface NFTCardProps {
   nft: NFTMetadata;
   walletAddress: string;
@@ -21,31 +24,46 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   const [allGatewaysFailed, setAllGatewaysFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [usingR2, setUsingR2] = useState(true);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // Get all possible image URLs for fallbacks
-  const imageUrls = getIpfsUrls(nft.rawImage || nft.image);
-  const currentImageUrl = isMounted ? (imageUrls[currentGatewayIndex] || '') : '';
-  const hasValidImage = imageUrls.length > 0 && !allGatewaysFailed;
+  // Primary: R2 URL (fast, reliable)
+  // Fallback: IPFS gateways (if R2 not configured or image missing)
+  const r2ImageUrl = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/images/${nft.tokenId}.png` : null;
+  const ipfsUrls = getIpfsUrls(nft.rawImage || nft.image);
+  
+  // Use R2 first, then fall back to IPFS gateways
+  const currentImageUrl = isMounted 
+    ? (usingR2 && r2ImageUrl ? r2ImageUrl : (ipfsUrls[currentGatewayIndex] || ''))
+    : '';
+  const hasValidImage = (r2ImageUrl || ipfsUrls.length > 0) && !allGatewaysFailed;
 
   // Mark as mounted (client-side only)
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Try next gateway if image fails
+  // Try next source if image fails (R2 -> IPFS gateways)
   const handleImageError = useCallback(() => {
-    if (currentGatewayIndex < imageUrls.length - 1) {
+    if (usingR2 && r2ImageUrl) {
+      // R2 failed, try IPFS
+      console.log(`R2 failed for #${nft.tokenId}, trying IPFS...`);
+      setUsingR2(false);
+      setImageLoaded(false);
+    } else if (currentGatewayIndex < ipfsUrls.length - 1) {
+      // Try next IPFS gateway
       setCurrentGatewayIndex(prev => prev + 1);
       setImageLoaded(false);
     } else {
+      // All sources failed
       setAllGatewaysFailed(true);
     }
-  }, [currentGatewayIndex, imageUrls.length]);
+  }, [usingR2, r2ImageUrl, currentGatewayIndex, ipfsUrls.length, nft.tokenId]);
 
   // Reset image state when NFT changes
   useEffect(() => {
     if (isMounted) {
+      setUsingR2(true);
       setCurrentGatewayIndex(0);
       setAllGatewaysFailed(false);
       setImageLoaded(false);
@@ -105,6 +123,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   };
 
   const handleRetryImage = () => {
+    setUsingR2(true);
     setCurrentGatewayIndex(0);
     setAllGatewaysFailed(false);
     setImageLoaded(false);
