@@ -1,0 +1,153 @@
+'use client';
+
+import { useState } from 'react';
+import Image from 'next/image';
+import { NFTMetadata } from '@/hooks/useNFTs';
+import { BLOCK_EXPLORER, CONTRACT_ADDRESS } from '@/lib/constants';
+
+interface NFTCardProps {
+  nft: NFTMetadata;
+  walletAddress: string;
+}
+
+export function NFTCard({ nft, walletAddress }: NFTCardProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/download/${nft.tokenId}`, {
+        headers: {
+          'x-wallet-address': walletAddress,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Download failed');
+      }
+
+      // Open download URL in new tab
+      window.open(data.downloadUrl, '_blank');
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      console.error('Download failed:', error);
+      setError(error.message || 'Download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const explorerUrl = `${BLOCK_EXPLORER}/token/${CONTRACT_ADDRESS}?a=${nft.tokenId}`;
+
+  return (
+    <div className="group bg-tmk-gray-900 border border-tmk-gray-800 rounded-2xl overflow-hidden
+                    transition-all duration-300 hover:border-tmk-red/50 hover:scale-[1.02]">
+      {/* Image Container */}
+      <div className="relative aspect-square bg-tmk-dark">
+        {nft.image && !imageError ? (
+          <Image
+            src={nft.image}
+            alt={nft.name}
+            fill
+            className="object-cover"
+            onError={() => setImageError(true)}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Image
+              src="/logo-icon.png"
+              alt="TMK"
+              width={80}
+              height={80}
+              className="opacity-30"
+            />
+          </div>
+        )}
+
+        {/* Token ID Badge */}
+        <div className="absolute top-3 right-3 px-2 py-1 bg-black/70 backdrop-blur-sm 
+                        rounded-lg text-sm font-mono text-white">
+          #{nft.tokenId}
+        </div>
+      </div>
+
+      {/* Card Content */}
+      <div className="p-4">
+        <h3 className="text-white font-bold font-heading mb-3 truncate">
+          {nft.name}
+        </h3>
+
+        {/* Error Message */}
+        {error && (
+          <p className="text-red-400 text-sm mb-3">{error}</p>
+        )}
+
+        {/* Buttons */}
+        <div className="flex gap-2">
+          {/* Download Button */}
+          <button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5
+                       bg-tmk-red hover:bg-tmk-red-hover disabled:bg-tmk-gray-700
+                       disabled:cursor-not-allowed text-white font-semibold rounded-xl
+                       transition-all duration-200"
+          >
+            {isDownloading ? (
+              <>
+                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Verifying...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>.blend</span>
+              </>
+            )}
+          </button>
+
+          {/* Explorer Link */}
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center p-2.5 bg-tmk-gray-800 
+                       hover:bg-tmk-gray-700 text-tmk-gray-400 hover:text-white
+                       rounded-xl transition-colors"
+            title="View on Explorer"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
