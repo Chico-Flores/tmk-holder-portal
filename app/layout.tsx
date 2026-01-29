@@ -21,19 +21,19 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TMK Holder Portal | THE MONEY KIDS 2025',
-  description: 'Verify your wallet to access exclusive Blender 3D files for your TMK NFTs on the Cronos blockchain.',
-  keywords: ['TMK', 'The Money Kids', 'NFT', 'Cronos', 'Blender', '3D', 'Holder Portal'],
+  title: 'TMK 3D Vault | THE MONEY KIDS',
+  description: 'Connect your wallet to access exclusive 3D Blender files for your TMK NFTs on the Cronos blockchain.',
+  keywords: ['TMK', 'The Money Kids', 'NFT', 'Cronos', 'Blender', '3D', '3D Vault'],
   openGraph: {
-    title: 'TMK Holder Portal | THE MONEY KIDS 2025',
-    description: 'Access exclusive Blender 3D files for your Money Kids NFTs',
+    title: 'TMK 3D Vault | THE MONEY KIDS',
+    description: 'Access exclusive 3D Blender files for your Money Kids NFTs',
     type: 'website',
     url: 'https://tmknft.com',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TMK Holder Portal',
-    description: 'Access exclusive Blender 3D files for your Money Kids NFTs',
+    title: 'TMK 3D Vault',
+    description: 'Access exclusive 3D Blender files for your Money Kids NFTs',
   },
   icons: {
     icon: '/logo-icon.png',

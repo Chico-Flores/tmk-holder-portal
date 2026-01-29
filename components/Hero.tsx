@@ -25,17 +25,17 @@ export function Hero({ hasWallet, isConnecting, onConnect }: HeroProps) {
 
       {/* Subtitle */}
       <p className="text-tmk-gray-400 text-lg sm:text-xl mb-2 tracking-widest font-heading">
-        2025 COLLECTION
+        FULL BODY COLLECTION
       </p>
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-8 font-heading">
-        HOLDER PORTAL
+        3D VAULT
       </h2>
 
       {/* Description */}
       <p className="text-tmk-gray-400 text-center max-w-md mb-8 leading-relaxed">
-        Verify your wallet to access exclusive
+        Connect your wallet to access exclusive
         <br />
-        <span className="text-white font-semibold">Blender 3D files</span> for your NFTs
+        <span className="text-white font-semibold">3D Blender files</span> for your NFTs
       </p>
 
       {/* Connect Button */}
