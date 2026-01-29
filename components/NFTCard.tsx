@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { NFTMetadata } from '@/hooks/useNFTs';
 import { BLOCK_EXPLORER, CONTRACT_ADDRESS } from '@/lib/constants';
 import { getIpfsUrls } from '@/lib/utils';
-import { ImageModal } from './ImageModal';
+import { NFTDetailModal } from './NFTDetailModal';
 
 // R2 public URL for images (set in Vercel env vars)
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
@@ -285,12 +285,13 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
         </div>
       </div>
 
-      {/* Image Modal - only render when mounted */}
+      {/* NFT Detail Modal - only render when mounted */}
       {isMounted && (
-        <ImageModal
+        <NFTDetailModal
           isOpen={isModalOpen}
+          tokenId={nft.tokenId}
           imageUrl={currentImageUrl}
-          title={nft.name}
+          walletAddress={walletAddress}
           onClose={() => setIsModalOpen(false)}
         />
       )}
