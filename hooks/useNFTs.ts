@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '@/lib/constants';
-import { ipfsToHttp, cacheMetadata, getCachedMetadata } from '@/lib/utils';
+import { ipfsToHttp, cacheMetadata, getCachedMetadata, clearMetadataCache } from '@/lib/utils';
 
 export interface NFTMetadata {
   tokenId: number;
   name: string;
   description: string;
   image: string;
+  rawImage: string; // Original image URI from metadata
   attributes?: Array<{
     trait_type: string;
     value: string | number;
@@ -26,19 +27,32 @@ interface NFTState {
   totalCount: number;
 }
 
-// Fetch with timeout and retry
-async function fetchWithRetry(url: string, retries: number = 2, timeout: number = 8000): Promise<Response> {
+// Fetch with timeout and retry - increased timeout for IPFS
+async function fetchWithRetry(url: string, retries: number = 2, timeout: number = 15000): Promise<Response> {
   for (let i = 0; i <= retries; i++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
       
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, { 
+        signal: controller.signal,
+        cache: 'force-cache', // Use browser cache when available
+      });
       clearTimeout(timeoutId);
       
       if (response.ok) return response;
-    } catch (error) {
-      if (i === retries) throw error;
+      
+      // If response not ok but not a network error, don't retry
+      if (response.status >= 400 && response.status < 500) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error: unknown) {
+      const err = error as { name?: string };
+      if (i === retries || (err.name !== 'AbortError' && !String(error).includes('fetch'))) {
+        throw error;
+      }
+      // Wait before retry
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
     }
   }
   throw new Error('Failed after retries');
@@ -56,7 +70,7 @@ export function useNFTs(address: string | null) {
   
   const isFetching = useRef(false);
 
-  const fetchNFTs = useCallback(async () => {
+  const fetchNFTs = useCallback(async (forceRefresh: boolean = false) => {
     if (!address || isFetching.current) {
       if (!address) setState({ nfts: [], isLoading: false, isLoadingMetadata: false, error: null, loadedCount: 0, totalCount: 0 });
       return;
@@ -64,9 +78,14 @@ export function useNFTs(address: string | null) {
 
     isFetching.current = true;
     
+    // Clear old cache format and optionally force refresh
+    if (forceRefresh) {
+      clearMetadataCache(address);
+    }
+    
     // Check cache first for instant loading
     const cached = getCachedMetadata<NFTMetadata[]>(address);
-    if (cached && cached.length > 0) {
+    if (cached && cached.length > 0 && !forceRefresh) {
       setState({
         nfts: cached,
         isLoading: false,
@@ -103,6 +122,7 @@ export function useNFTs(address: string | null) {
         name: `TMK #${Number(tokenId)}`,
         description: '',
         image: '',
+        rawImage: '',
         isLoading: true,
       }));
 
@@ -117,7 +137,7 @@ export function useNFTs(address: string | null) {
       });
 
       // Fetch metadata in parallel (larger batches for speed)
-      const batchSize = 10;
+      const batchSize = 8;
       const nfts: NFTMetadata[] = [...placeholderNfts];
       let loadedCount = 0;
 
@@ -130,16 +150,25 @@ export function useNFTs(address: string | null) {
             try {
               const tokenIdNum = Number(tokenId);
               const tokenURI = await contract.tokenURI(tokenId);
+              
+              // Convert tokenURI to HTTP
               const metadataUrl = ipfsToHttp(tokenURI);
+              console.log(`Fetching metadata for #${tokenIdNum}:`, metadataUrl);
               
               const response = await fetchWithRetry(metadataUrl);
               const metadata = await response.json();
+              
+              // Store both raw and converted image URL
+              const rawImage = metadata.image || '';
+              const imageUrl = ipfsToHttp(rawImage);
+              console.log(`Image for #${tokenIdNum}: raw=${rawImage}, converted=${imageUrl}`);
 
               const nft: NFTMetadata = {
                 tokenId: tokenIdNum,
                 name: metadata.name || `TMK #${tokenIdNum}`,
                 description: metadata.description || '',
-                image: ipfsToHttp(metadata.image || ''),
+                image: imageUrl,
+                rawImage: rawImage,
                 attributes: metadata.attributes || [],
                 isLoading: false,
               };
@@ -163,6 +192,7 @@ export function useNFTs(address: string | null) {
                 name: `TMK #${tokenIdNum}`,
                 description: '',
                 image: '',
+                rawImage: '',
                 attributes: [],
                 isLoading: false,
               };
@@ -213,7 +243,8 @@ export function useNFTs(address: string | null) {
 
       // Only update if count changed
       if (tokenIds.length !== currentNfts.length) {
-        fetchNFTs();
+        clearMetadataCache(addr);
+        fetchNFTs(true);
       }
     } catch {
       // Silent fail for background refresh
@@ -227,6 +258,6 @@ export function useNFTs(address: string | null) {
 
   return {
     ...state,
-    refetch: fetchNFTs,
+    refetch: () => fetchNFTs(true),
   };
 }

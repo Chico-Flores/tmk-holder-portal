@@ -11,13 +11,41 @@ export function shortenAddress(address: string, chars: number = 4): string {
 
 /**
  * IPFS Gateway URLs - ordered by reliability/speed
+ * Using multiple formats to handle different IPFS URI structures
  */
 const IPFS_GATEWAYS = [
-  'https://nftstorage.link/ipfs/',
-  'https://cloudflare-ipfs.com/ipfs/',
-  'https://dweb.link/ipfs/',
   'https://ipfs.io/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://dweb.link/ipfs/',
+  'https://nftstorage.link/ipfs/',
+  'https://w3s.link/ipfs/',
 ];
+
+/**
+ * Extract IPFS hash from various URI formats
+ */
+function extractIpfsHash(uri: string): string | null {
+  if (!uri) return null;
+  
+  // Handle ipfs:// protocol
+  if (uri.startsWith('ipfs://')) {
+    return uri.replace('ipfs://', '');
+  }
+  
+  // Handle /ipfs/ path in URL
+  if (uri.includes('/ipfs/')) {
+    const parts = uri.split('/ipfs/');
+    return parts[parts.length - 1];
+  }
+  
+  // Handle raw CID (starts with Qm or bafy)
+  if (uri.startsWith('Qm') || uri.startsWith('bafy')) {
+    return uri;
+  }
+  
+  return null;
+}
 
 /**
  * Converts IPFS URI to HTTP gateway URL
@@ -28,27 +56,19 @@ const IPFS_GATEWAYS = [
 export function ipfsToHttp(uri: string, gatewayIndex: number = 0): string {
   if (!uri) return '';
   
-  // Already HTTP(S) - but check if it's using a slow gateway
-  if (uri.startsWith('http://') || uri.startsWith('https://')) {
-    // Replace slow ipfs.io gateway with faster one
-    if (uri.includes('ipfs.io/ipfs/')) {
-      const hash = uri.split('/ipfs/')[1];
-      return `${IPFS_GATEWAYS[gatewayIndex % IPFS_GATEWAYS.length]}${hash}`;
-    }
+  // If it's already a regular HTTP URL (not IPFS), return as-is
+  if ((uri.startsWith('http://') || uri.startsWith('https://')) && !uri.includes('/ipfs/')) {
     return uri;
   }
   
-  // IPFS protocol
-  if (uri.startsWith('ipfs://')) {
-    const hash = uri.replace('ipfs://', '');
-    return `${IPFS_GATEWAYS[gatewayIndex % IPFS_GATEWAYS.length]}${hash}`;
+  // Extract IPFS hash
+  const hash = extractIpfsHash(uri);
+  if (hash) {
+    const gateway = IPFS_GATEWAYS[gatewayIndex % IPFS_GATEWAYS.length];
+    return `${gateway}${hash}`;
   }
   
-  // Just a hash
-  if (uri.startsWith('Qm') || uri.startsWith('bafy')) {
-    return `${IPFS_GATEWAYS[gatewayIndex % IPFS_GATEWAYS.length]}${uri}`;
-  }
-  
+  // Return original if we can't parse it
   return uri;
 }
 
@@ -56,7 +76,19 @@ export function ipfsToHttp(uri: string, gatewayIndex: number = 0): string {
  * Get all IPFS gateway URLs for an IPFS URI (for fallbacks)
  */
 export function getIpfsUrls(uri: string): string[] {
-  return IPFS_GATEWAYS.map((_, index) => ipfsToHttp(uri, index));
+  if (!uri) return [];
+  
+  // If it's not an IPFS URL, just return it
+  if ((uri.startsWith('http://') || uri.startsWith('https://')) && !uri.includes('/ipfs/')) {
+    return [uri];
+  }
+  
+  const hash = extractIpfsHash(uri);
+  if (hash) {
+    return IPFS_GATEWAYS.map(gateway => `${gateway}${hash}`);
+  }
+  
+  return [uri];
 }
 
 /**
@@ -91,7 +123,7 @@ export function safeJsonParse<T>(json: string): T | null {
  * Cache key for NFT metadata
  */
 export function getMetadataCacheKey(address: string): string {
-  return `tmk_nfts_${address.toLowerCase()}`;
+  return `tmk_nfts_v2_${address.toLowerCase()}`;
 }
 
 /**
@@ -128,5 +160,19 @@ export function getCachedMetadata<T>(address: string, maxAge: number = 5 * 60 * 
     return data as T;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Clear metadata cache for an address
+ */
+export function clearMetadataCache(address: string): void {
+  try {
+    const key = getMetadataCacheKey(address);
+    localStorage.removeItem(key);
+    // Also clear old cache key format
+    localStorage.removeItem(`tmk_nfts_${address.toLowerCase()}`);
+  } catch {
+    // Ignore errors
   }
 }

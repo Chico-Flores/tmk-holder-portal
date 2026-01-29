@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import Image from 'next/image';
 
 interface ImageModalProps {
   isOpen: boolean;
@@ -54,17 +53,15 @@ export function ImageModal({ isOpen, imageUrl, title, onClose }: ImageModalProps
 
       {/* Image Container */}
       <div 
-        className="relative max-w-[90vw] max-h-[85vh] aspect-square"
+        className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <Image
+        {/* Use regular img tag for better IPFS compatibility */}
+        <img
           src={imageUrl}
           alt={title}
-          fill
-          className="object-contain rounded-2xl"
-          sizes="90vw"
-          unoptimized
-          priority
+          className="max-w-full max-h-[85vh] object-contain rounded-2xl"
+          crossOrigin="anonymous"
         />
       </div>
     </div>

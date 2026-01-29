@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { NFTMetadata } from '@/hooks/useNFTs';
 import { BLOCK_EXPLORER, CONTRACT_ADDRESS } from '@/lib/constants';
@@ -16,30 +16,34 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imageError, setImageError] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [allGatewaysFailed, setAllGatewaysFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Get all possible image URLs for fallbacks
-  const imageUrls = nft.image ? getIpfsUrls(nft.image) : [];
-  const currentImageUrl = imageUrls[currentImageIndex] || '';
+  // Get all possible image URLs for fallbacks using raw image URI
+  const imageUrls = getIpfsUrls(nft.rawImage || nft.image);
+  const currentImageUrl = imageUrls[currentGatewayIndex] || '';
+  const hasValidImage = imageUrls.length > 0 && !allGatewaysFailed;
 
   // Try next gateway if image fails
-  const handleImageError = () => {
-    if (currentImageIndex < imageUrls.length - 1) {
-      setCurrentImageIndex(prev => prev + 1);
+  const handleImageError = useCallback(() => {
+    console.log(`Image failed for #${nft.tokenId}, gateway ${currentGatewayIndex}:`, currentImageUrl);
+    if (currentGatewayIndex < imageUrls.length - 1) {
+      setCurrentGatewayIndex(prev => prev + 1);
+      setImageLoaded(false);
     } else {
-      setImageError(true);
+      console.log(`All gateways failed for #${nft.tokenId}`);
+      setAllGatewaysFailed(true);
     }
-  };
+  }, [currentGatewayIndex, imageUrls.length, currentImageUrl, nft.tokenId]);
 
   // Reset image state when NFT changes
   useEffect(() => {
-    setCurrentImageIndex(0);
-    setImageError(false);
+    setCurrentGatewayIndex(0);
+    setAllGatewaysFailed(false);
     setImageLoaded(false);
-  }, [nft.tokenId, nft.image]);
+  }, [nft.tokenId, nft.rawImage]);
 
   const handleDownload3D = async () => {
     setIsDownloading(true);
@@ -70,7 +74,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   };
 
   const handleDownloadImage = async () => {
-    if (!currentImageUrl) return;
+    if (!currentImageUrl || allGatewaysFailed) return;
     
     setIsDownloadingImage(true);
     
@@ -95,6 +99,12 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
     } finally {
       setIsDownloadingImage(false);
     }
+  };
+
+  const handleRetryImage = () => {
+    setCurrentGatewayIndex(0);
+    setAllGatewaysFailed(false);
+    setImageLoaded(false);
   };
 
   const explorerUrl = `${BLOCK_EXPLORER}/token/${CONTRACT_ADDRESS}?a=${nft.tokenId}`;
@@ -136,27 +146,30 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
                       transition-all duration-300 hover:border-tmk-red/50 hover:scale-[1.02]">
         {/* Image Container - Clickable */}
         <div 
-          className="relative aspect-square bg-tmk-dark cursor-pointer"
-          onClick={() => currentImageUrl && !imageError && setIsModalOpen(true)}
+          className={`relative aspect-square bg-tmk-dark ${hasValidImage && imageLoaded ? 'cursor-pointer' : ''}`}
+          onClick={() => hasValidImage && imageLoaded && setIsModalOpen(true)}
         >
           {/* Loading shimmer */}
-          {!imageLoaded && !imageError && currentImageUrl && (
+          {!imageLoaded && hasValidImage && (
             <div className="absolute inset-0 animate-shimmer z-10" />
           )}
 
-          {currentImageUrl && !imageError ? (
+          {hasValidImage && currentImageUrl ? (
             <>
-              <Image
+              {/* Use regular img tag for better CORS handling with IPFS */}
+              <img
                 src={currentImageUrl}
                 alt={nft.name}
-                fill
-                className={`object-cover transition-opacity duration-300 ${
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
-                onLoad={() => setImageLoaded(true)}
+                onLoad={() => {
+                  console.log(`Image loaded for #${nft.tokenId}`);
+                  setImageLoaded(true);
+                }}
                 onError={handleImageError}
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                unoptimized
+                loading="lazy"
+                crossOrigin="anonymous"
               />
               {/* Expand hint on hover */}
               {imageLoaded && (
@@ -172,7 +185,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
               <Image
                 src="/logo-icon.png"
                 alt="TMK"
@@ -180,6 +193,14 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
                 height={80}
                 className="opacity-30"
               />
+              {allGatewaysFailed && (
+                <button
+                  onClick={handleRetryImage}
+                  className="text-xs text-tmk-gray-400 hover:text-white underline"
+                >
+                  Retry loading
+                </button>
+              )}
             </div>
           )}
 
@@ -248,7 +269,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
               {/* Download Image Button */}
               <button
                 onClick={handleDownloadImage}
-                disabled={isDownloadingImage || !currentImageUrl || imageError}
+                disabled={isDownloadingImage || !hasValidImage || !imageLoaded}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5
                            bg-tmk-gray-800 hover:bg-tmk-gray-700 
                            disabled:bg-tmk-gray-800/50 disabled:cursor-not-allowed
