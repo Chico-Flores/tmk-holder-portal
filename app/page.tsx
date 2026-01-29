@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useWallet } from '@/hooks/useWallet';
 import { useNFTs } from '@/hooks/useNFTs';
 import { Header } from '@/components/Header';
@@ -11,6 +12,13 @@ import { NFTGrid } from '@/components/NFTGrid';
 import { Footer } from '@/components/Footer';
 
 export default function Home() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Only render dynamic content after mount to avoid hydration mismatches
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const {
     address,
     isConnecting,
@@ -34,10 +42,21 @@ export default function Home() {
     isConnected && isCorrectNetwork ? address : null
   );
 
-  // Show loading only during initial token fetch, not metadata loading
+  // Show loading only during initial token fetch
   const showInitialLoading = isLoading && nfts.length === 0;
   const showNFTs = !isLoading && nfts.length > 0;
   const showEmpty = !isLoading && nfts.length === 0 && !isLoadingMetadata;
+
+  // Don't render anything until mounted to avoid hydration issues
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen flex flex-col bg-black">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-pulse text-tmk-gray-400">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -101,7 +120,7 @@ export default function Home() {
         {/* Connected and Correct Network */}
         {isConnected && isCorrectNetwork && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* Initial Loading State (before we know NFT count) */}
+            {/* Initial Loading State */}
             {showInitialLoading && (
               <LoadingState loadedCount={loadedCount} totalCount={totalCount} />
             )}
@@ -109,7 +128,7 @@ export default function Home() {
             {/* Empty State */}
             {showEmpty && <EmptyState />}
 
-            {/* NFTs Found - Show immediately with loading states */}
+            {/* NFTs Found */}
             {showNFTs && (
               <>
                 <StatsBar nftCount={nfts.length} />

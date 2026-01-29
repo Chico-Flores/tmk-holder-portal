@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '@/lib/constants';
-import { ipfsToHttp, cacheMetadata, getCachedMetadata, clearMetadataCache } from '@/lib/utils';
+import { ipfsToHttp, cacheMetadata, getCachedMetadata, clearMetadataCache, delay } from '@/lib/utils';
 
 export interface NFTMetadata {
   tokenId: number;
@@ -27,32 +27,78 @@ interface NFTState {
   totalCount: number;
 }
 
-// Fetch with timeout and retry
-async function fetchWithRetry(url: string, retries: number = 2, timeout: number = 15000): Promise<Response> {
-  for (let i = 0; i <= retries; i++) {
+// Alternative RPC endpoints for Cronos
+const RPC_ENDPOINTS = [
+  RPC_URL,
+  'https://evm.cronos.org',
+  'https://cronos-evm.publicnode.com',
+  'https://cronos.blockpi.network/v1/rpc/public',
+];
+
+// Get a provider, trying multiple endpoints
+async function getWorkingProvider(): Promise<ethers.JsonRpcProvider> {
+  for (const rpc of RPC_ENDPOINTS) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-      
-      const response = await fetch(url, { 
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      
-      if (response.ok) return response;
-      
-      if (response.status >= 400 && response.status < 500) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-    } catch (error: unknown) {
-      const err = error as { name?: string };
-      if (i === retries || (err.name !== 'AbortError' && !String(error).includes('fetch'))) {
-        throw error;
-      }
-      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      const provider = new ethers.JsonRpcProvider(rpc);
+      // Test the connection
+      await provider.getBlockNumber();
+      return provider;
+    } catch {
+      console.log(`RPC ${rpc} failed, trying next...`);
     }
   }
-  throw new Error('Failed after retries');
+  // Fallback to first
+  return new ethers.JsonRpcProvider(RPC_ENDPOINTS[0]);
+}
+
+// Fetch tokenURI with retry
+async function fetchTokenURIWithRetry(
+  contract: ethers.Contract, 
+  tokenId: bigint, 
+  maxRetries: number = 3
+): Promise<string> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        await delay(1000 * attempt); // Increasing delay between retries
+      }
+      const uri = await contract.tokenURI(tokenId);
+      return uri;
+    } catch (error) {
+      lastError = error as Error;
+      console.log(`tokenURI attempt ${attempt + 1} failed for token ${tokenId}`);
+    }
+  }
+  
+  throw lastError;
+}
+
+// Fetch metadata from IPFS with retry
+async function fetchMetadataWithRetry(url: string, maxRetries: number = 3): Promise<unknown> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        await delay(500 * attempt);
+      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      lastError = error as Error;
+    }
+  }
+  
+  throw lastError;
 }
 
 export function useNFTs(address: string | null) {
@@ -70,13 +116,15 @@ export function useNFTs(address: string | null) {
 
   const fetchNFTs = useCallback(async (forceRefresh: boolean = false) => {
     if (!address || isFetching.current) {
-      if (!address) setState({ nfts: [], isLoading: false, isLoadingMetadata: false, error: null, loadedCount: 0, totalCount: 0 });
+      if (!address) {
+        setState({ nfts: [], isLoading: false, isLoadingMetadata: false, error: null, loadedCount: 0, totalCount: 0 });
+      }
       return;
     }
 
     isFetching.current = true;
     
-    // Only check cache after component has mounted (client-side only)
+    // Check cache first (only on client after mount)
     if (hasMounted.current && !forceRefresh) {
       const cached = getCachedMetadata<NFTMetadata[]>(address);
       if (cached && cached.length > 0) {
@@ -88,7 +136,6 @@ export function useNFTs(address: string | null) {
           loadedCount: cached.length,
           totalCount: cached.length,
         });
-        refreshInBackground(address, cached);
         isFetching.current = false;
         return;
       }
@@ -101,9 +148,11 @@ export function useNFTs(address: string | null) {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const provider = new ethers.JsonRpcProvider(RPC_URL);
+      // Get a working provider
+      const provider = await getWorkingProvider();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
+      // Get all token IDs
       const tokenIds: bigint[] = await contract.tokensOfOwner(address);
 
       if (tokenIds.length === 0) {
@@ -112,6 +161,7 @@ export function useNFTs(address: string | null) {
         return;
       }
 
+      // Create placeholders
       const placeholderNfts: NFTMetadata[] = tokenIds.map(tokenId => ({
         tokenId: Number(tokenId),
         name: `TMK #${Number(tokenId)}`,
@@ -130,23 +180,36 @@ export function useNFTs(address: string | null) {
         totalCount: tokenIds.length,
       });
 
-      const batchSize = 8;
+      // Fetch metadata with smaller batches and delays to avoid rate limiting
+      const batchSize = 4; // Smaller batches
       const nfts: NFTMetadata[] = [...placeholderNfts];
       let loadedCount = 0;
 
       for (let i = 0; i < tokenIds.length; i += batchSize) {
+        // Add delay between batches to avoid rate limiting
+        if (i > 0) {
+          await delay(500);
+        }
+        
         const batch = tokenIds.slice(i, i + batchSize);
         
         await Promise.all(
           batch.map(async (tokenId, batchIndex) => {
             const index = i + batchIndex;
+            const tokenIdNum = Number(tokenId);
+            
             try {
-              const tokenIdNum = Number(tokenId);
-              const tokenURI = await contract.tokenURI(tokenId);
+              // Fetch tokenURI with retry
+              const tokenURI = await fetchTokenURIWithRetry(contract, tokenId);
               const metadataUrl = ipfsToHttp(tokenURI);
               
-              const response = await fetchWithRetry(metadataUrl);
-              const metadata = await response.json();
+              // Fetch metadata with retry
+              const metadata = await fetchMetadataWithRetry(metadataUrl) as {
+                name?: string;
+                description?: string;
+                image?: string;
+                attributes?: Array<{ trait_type: string; value: string | number }>;
+              };
               
               const rawImage = metadata.image || '';
               const imageUrl = ipfsToHttp(rawImage);
@@ -172,8 +235,7 @@ export function useNFTs(address: string | null) {
 
               return nft;
             } catch (error) {
-              console.error(`Failed to fetch metadata for token ${tokenId}:`, error);
-              const tokenIdNum = Number(tokenId);
+              console.error(`Failed to fetch metadata for token ${tokenIdNum}:`, error);
               const nft: NFTMetadata = {
                 tokenId: tokenIdNum,
                 name: `TMK #${tokenIdNum}`,
@@ -185,12 +247,20 @@ export function useNFTs(address: string | null) {
               };
               nfts[index] = nft;
               loadedCount++;
+              
+              setState(prev => ({
+                ...prev,
+                nfts: [...nfts],
+                loadedCount,
+              }));
+              
               return nft;
             }
           })
         );
       }
 
+      // Sort and cache
       nfts.sort((a, b) => a.tokenId - b.tokenId);
       cacheMetadata(address, nfts);
 
@@ -205,33 +275,16 @@ export function useNFTs(address: string | null) {
     } catch (error: unknown) {
       console.error('Failed to fetch NFTs:', error);
       const err = error as { message?: string };
-      setState({
-        nfts: [],
+      setState(prev => ({
+        ...prev,
         isLoading: false,
         isLoadingMetadata: false,
         error: err.message || 'Failed to fetch NFTs. Please try again.',
-        loadedCount: 0,
-        totalCount: 0,
-      });
+      }));
     } finally {
       isFetching.current = false;
     }
   }, [address]);
-
-  const refreshInBackground = async (addr: string, currentNfts: NFTMetadata[]) => {
-    try {
-      const provider = new ethers.JsonRpcProvider(RPC_URL);
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-      const tokenIds: bigint[] = await contract.tokensOfOwner(addr);
-
-      if (tokenIds.length !== currentNfts.length) {
-        clearMetadataCache(addr);
-        fetchNFTs(true);
-      }
-    } catch {
-      // Silent fail
-    }
-  };
 
   // Mark as mounted and fetch
   useEffect(() => {
@@ -239,6 +292,10 @@ export function useNFTs(address: string | null) {
     if (address) {
       fetchNFTs();
     }
+    
+    return () => {
+      hasMounted.current = false;
+    };
   }, [address, fetchNFTs]);
 
   return {
