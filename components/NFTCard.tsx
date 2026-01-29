@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { NFTMetadata } from '@/hooks/useNFTs';
 import { BLOCK_EXPLORER, CONTRACT_ADDRESS } from '@/lib/constants';
@@ -20,30 +20,37 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [allGatewaysFailed, setAllGatewaysFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
 
-  // Get all possible image URLs for fallbacks using raw image URI
+  // Get all possible image URLs for fallbacks
   const imageUrls = getIpfsUrls(nft.rawImage || nft.image);
-  const currentImageUrl = imageUrls[currentGatewayIndex] || '';
+  const currentImageUrl = isMounted ? (imageUrls[currentGatewayIndex] || '') : '';
   const hasValidImage = imageUrls.length > 0 && !allGatewaysFailed;
+
+  // Mark as mounted (client-side only)
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Try next gateway if image fails
   const handleImageError = useCallback(() => {
-    console.log(`Image failed for #${nft.tokenId}, gateway ${currentGatewayIndex}:`, currentImageUrl);
     if (currentGatewayIndex < imageUrls.length - 1) {
       setCurrentGatewayIndex(prev => prev + 1);
       setImageLoaded(false);
     } else {
-      console.log(`All gateways failed for #${nft.tokenId}`);
       setAllGatewaysFailed(true);
     }
-  }, [currentGatewayIndex, imageUrls.length, currentImageUrl, nft.tokenId]);
+  }, [currentGatewayIndex, imageUrls.length]);
 
   // Reset image state when NFT changes
   useEffect(() => {
-    setCurrentGatewayIndex(0);
-    setAllGatewaysFailed(false);
-    setImageLoaded(false);
-  }, [nft.tokenId, nft.rawImage]);
+    if (isMounted) {
+      setCurrentGatewayIndex(0);
+      setAllGatewaysFailed(false);
+      setImageLoaded(false);
+    }
+  }, [nft.tokenId, nft.rawImage, isMounted]);
 
   const handleDownload3D = async () => {
     setIsDownloading(true);
@@ -62,7 +69,6 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
         throw new Error(data.error || 'Download failed');
       }
 
-      // Open download URL in new tab
       window.open(data.downloadUrl, '_blank');
     } catch (err: unknown) {
       const error = err as { message?: string };
@@ -79,11 +85,9 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
     setIsDownloadingImage(true);
     
     try {
-      // Fetch the image
       const response = await fetch(currentImageUrl);
       const blob = await response.blob();
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -94,7 +98,6 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Image download failed:', err);
-      // Fallback: open in new tab
       window.open(currentImageUrl, '_blank');
     } finally {
       setIsDownloadingImage(false);
@@ -109,21 +112,17 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
 
   const explorerUrl = `${BLOCK_EXPLORER}/token/${CONTRACT_ADDRESS}?a=${nft.tokenId}`;
 
-  // Show skeleton if NFT is still loading
+  // Show skeleton if NFT is still loading metadata
   if (nft.isLoading) {
     return (
       <div className="bg-tmk-gray-900 border border-tmk-gray-800 rounded-2xl overflow-hidden">
-        {/* Image Skeleton */}
         <div className="relative aspect-square bg-tmk-dark">
           <div className="absolute inset-0 animate-shimmer" />
-          {/* Token ID Badge */}
           <div className="absolute top-3 right-3 px-2 py-1 bg-black/70 backdrop-blur-sm 
                           rounded-lg text-sm font-mono text-white">
             #{nft.tokenId}
           </div>
         </div>
-
-        {/* Content */}
         <div className="p-4">
           <h3 className="text-white font-bold font-heading mb-3">
             TMK #{nft.tokenId}
@@ -144,34 +143,30 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
     <>
       <div className="group bg-tmk-gray-900 border border-tmk-gray-800 rounded-2xl overflow-hidden
                       transition-all duration-300 hover:border-tmk-red/50 hover:scale-[1.02]">
-        {/* Image Container - Clickable */}
+        {/* Image Container */}
         <div 
           className={`relative aspect-square bg-tmk-dark ${hasValidImage && imageLoaded ? 'cursor-pointer' : ''}`}
           onClick={() => hasValidImage && imageLoaded && setIsModalOpen(true)}
         >
-          {/* Loading shimmer */}
-          {!imageLoaded && hasValidImage && (
+          {/* Loading shimmer - only show when mounted and loading */}
+          {isMounted && !imageLoaded && hasValidImage && currentImageUrl && (
             <div className="absolute inset-0 animate-shimmer z-10" />
           )}
 
-          {hasValidImage && currentImageUrl ? (
+          {/* Image - only render on client */}
+          {isMounted && hasValidImage && currentImageUrl ? (
             <>
-              {/* Use regular img tag for better CORS handling with IPFS */}
               <img
+                ref={imgRef}
                 src={currentImageUrl}
                 alt={nft.name}
                 className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
-                onLoad={() => {
-                  console.log(`Image loaded for #${nft.tokenId}`);
-                  setImageLoaded(true);
-                }}
+                onLoad={() => setImageLoaded(true)}
                 onError={handleImageError}
                 loading="lazy"
-                crossOrigin="anonymous"
               />
-              {/* Expand hint on hover */}
               {imageLoaded && (
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 
                                 transition-colors flex items-center justify-center">
@@ -193,7 +188,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
                 height={80}
                 className="opacity-30"
               />
-              {allGatewaysFailed && (
+              {isMounted && allGatewaysFailed && (
                 <button
                   onClick={handleRetryImage}
                   className="text-xs text-tmk-gray-400 hover:text-white underline"
@@ -217,12 +212,10 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
             {nft.name}
           </h3>
 
-          {/* Error Message */}
           {error && (
             <p className="text-red-400 text-sm mb-3">{error}</p>
           )}
 
-          {/* Buttons */}
           <div className="flex flex-col gap-2">
             {/* Download 3D File Button */}
             <button
@@ -236,20 +229,8 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
               {isDownloading ? (
                 <>
                   <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
                   <span>Verifying...</span>
                 </>
@@ -264,9 +245,8 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
               )}
             </button>
 
-            {/* Bottom row: Image download + Explorer link */}
+            {/* Bottom row */}
             <div className="flex gap-2">
-              {/* Download Image Button */}
               <button
                 onClick={handleDownloadImage}
                 disabled={isDownloadingImage || !hasValidImage || !imageLoaded}
@@ -290,7 +270,6 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
                 <span>Save Image</span>
               </button>
 
-              {/* Explorer Link */}
               <a
                 href={explorerUrl}
                 target="_blank"
@@ -310,13 +289,15 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
         </div>
       </div>
 
-      {/* Image Modal */}
-      <ImageModal
-        isOpen={isModalOpen}
-        imageUrl={currentImageUrl}
-        title={nft.name}
-        onClose={() => setIsModalOpen(false)}
-      />
+      {/* Image Modal - only render when mounted */}
+      {isMounted && (
+        <ImageModal
+          isOpen={isModalOpen}
+          imageUrl={currentImageUrl}
+          title={nft.name}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
     </>
   );
 }

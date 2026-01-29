@@ -10,7 +10,7 @@ export interface NFTMetadata {
   name: string;
   description: string;
   image: string;
-  rawImage: string; // Original image URI from metadata
+  rawImage: string;
   attributes?: Array<{
     trait_type: string;
     value: string | number;
@@ -27,7 +27,7 @@ interface NFTState {
   totalCount: number;
 }
 
-// Fetch with timeout and retry - increased timeout for IPFS
+// Fetch with timeout and retry
 async function fetchWithRetry(url: string, retries: number = 2, timeout: number = 15000): Promise<Response> {
   for (let i = 0; i <= retries; i++) {
     try {
@@ -36,13 +36,11 @@ async function fetchWithRetry(url: string, retries: number = 2, timeout: number 
       
       const response = await fetch(url, { 
         signal: controller.signal,
-        cache: 'force-cache', // Use browser cache when available
       });
       clearTimeout(timeoutId);
       
       if (response.ok) return response;
       
-      // If response not ok but not a network error, don't retry
       if (response.status >= 400 && response.status < 500) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -51,7 +49,6 @@ async function fetchWithRetry(url: string, retries: number = 2, timeout: number 
       if (i === retries || (err.name !== 'AbortError' && !String(error).includes('fetch'))) {
         throw error;
       }
-      // Wait before retry
       await new Promise(r => setTimeout(r, 1000 * (i + 1)));
     }
   }
@@ -69,6 +66,7 @@ export function useNFTs(address: string | null) {
   });
   
   const isFetching = useRef(false);
+  const hasMounted = useRef(false);
 
   const fetchNFTs = useCallback(async (forceRefresh: boolean = false) => {
     if (!address || isFetching.current) {
@@ -78,36 +76,34 @@ export function useNFTs(address: string | null) {
 
     isFetching.current = true;
     
-    // Clear old cache format and optionally force refresh
-    if (forceRefresh) {
-      clearMetadataCache(address);
+    // Only check cache after component has mounted (client-side only)
+    if (hasMounted.current && !forceRefresh) {
+      const cached = getCachedMetadata<NFTMetadata[]>(address);
+      if (cached && cached.length > 0) {
+        setState({
+          nfts: cached,
+          isLoading: false,
+          isLoadingMetadata: false,
+          error: null,
+          loadedCount: cached.length,
+          totalCount: cached.length,
+        });
+        refreshInBackground(address, cached);
+        isFetching.current = false;
+        return;
+      }
     }
     
-    // Check cache first for instant loading
-    const cached = getCachedMetadata<NFTMetadata[]>(address);
-    if (cached && cached.length > 0 && !forceRefresh) {
-      setState({
-        nfts: cached,
-        isLoading: false,
-        isLoadingMetadata: false,
-        error: null,
-        loadedCount: cached.length,
-        totalCount: cached.length,
-      });
-      // Still refresh in background
-      refreshInBackground(address, cached);
-      isFetching.current = false;
-      return;
+    if (forceRefresh) {
+      clearMetadataCache(address);
     }
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Create provider and contract
       const provider = new ethers.JsonRpcProvider(RPC_URL);
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
-      // Get all token IDs owned by this address
       const tokenIds: bigint[] = await contract.tokensOfOwner(address);
 
       if (tokenIds.length === 0) {
@@ -116,7 +112,6 @@ export function useNFTs(address: string | null) {
         return;
       }
 
-      // Create placeholder NFTs immediately so UI shows cards
       const placeholderNfts: NFTMetadata[] = tokenIds.map(tokenId => ({
         tokenId: Number(tokenId),
         name: `TMK #${Number(tokenId)}`,
@@ -126,7 +121,6 @@ export function useNFTs(address: string | null) {
         isLoading: true,
       }));
 
-      // Show placeholders immediately
       setState({
         nfts: placeholderNfts,
         isLoading: false,
@@ -136,7 +130,6 @@ export function useNFTs(address: string | null) {
         totalCount: tokenIds.length,
       });
 
-      // Fetch metadata in parallel (larger batches for speed)
       const batchSize = 8;
       const nfts: NFTMetadata[] = [...placeholderNfts];
       let loadedCount = 0;
@@ -144,24 +137,19 @@ export function useNFTs(address: string | null) {
       for (let i = 0; i < tokenIds.length; i += batchSize) {
         const batch = tokenIds.slice(i, i + batchSize);
         
-        const batchResults = await Promise.all(
+        await Promise.all(
           batch.map(async (tokenId, batchIndex) => {
             const index = i + batchIndex;
             try {
               const tokenIdNum = Number(tokenId);
               const tokenURI = await contract.tokenURI(tokenId);
-              
-              // Convert tokenURI to HTTP
               const metadataUrl = ipfsToHttp(tokenURI);
-              console.log(`Fetching metadata for #${tokenIdNum}:`, metadataUrl);
               
               const response = await fetchWithRetry(metadataUrl);
               const metadata = await response.json();
               
-              // Store both raw and converted image URL
               const rawImage = metadata.image || '';
               const imageUrl = ipfsToHttp(rawImage);
-              console.log(`Image for #${tokenIdNum}: raw=${rawImage}, converted=${imageUrl}`);
 
               const nft: NFTMetadata = {
                 tokenId: tokenIdNum,
@@ -173,7 +161,6 @@ export function useNFTs(address: string | null) {
                 isLoading: false,
               };
 
-              // Update individual NFT as it loads
               nfts[index] = nft;
               loadedCount++;
               
@@ -204,10 +191,7 @@ export function useNFTs(address: string | null) {
         );
       }
 
-      // Sort by token ID
       nfts.sort((a, b) => a.tokenId - b.tokenId);
-
-      // Cache for future visits
       cacheMetadata(address, nfts);
 
       setState({
@@ -234,27 +218,28 @@ export function useNFTs(address: string | null) {
     }
   }, [address]);
 
-  // Background refresh (silent update)
   const refreshInBackground = async (addr: string, currentNfts: NFTMetadata[]) => {
     try {
       const provider = new ethers.JsonRpcProvider(RPC_URL);
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
       const tokenIds: bigint[] = await contract.tokensOfOwner(addr);
 
-      // Only update if count changed
       if (tokenIds.length !== currentNfts.length) {
         clearMetadataCache(addr);
         fetchNFTs(true);
       }
     } catch {
-      // Silent fail for background refresh
+      // Silent fail
     }
   };
 
-  // Fetch NFTs when address changes
+  // Mark as mounted and fetch
   useEffect(() => {
-    fetchNFTs();
-  }, [fetchNFTs]);
+    hasMounted.current = true;
+    if (address) {
+      fetchNFTs();
+    }
+  }, [address, fetchNFTs]);
 
   return {
     ...state,
