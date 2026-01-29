@@ -18,6 +18,8 @@ interface NFTDetailModalProps {
 
 export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClose }: NFTDetailModalProps) {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
+  const [rank, setRank] = useState<number | null>(null);
+  const [totalSupply, setTotalSupply] = useState<number>(1500);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +36,8 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
         if (response.ok) {
           const data = await response.json();
           setAttributes(data.attributes || []);
+          setRank(data.rank || null);
+          setTotalSupply(data.totalSupply || 1500);
         } else {
           setError('Could not load traits');
         }
@@ -104,6 +108,22 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
   };
 
   const explorerUrl = `${BLOCK_EXPLORER}/token/${CONTRACT_ADDRESS}?a=${tokenId}`;
+
+  // Determine rank tier for styling
+  const getRankTier = (rank: number) => {
+    if (rank <= 50) return 'legendary'; // Top 50
+    if (rank <= 150) return 'epic';     // Top 10%
+    if (rank <= 375) return 'rare';     // Top 25%
+    return 'common';
+  };
+
+  const rankTier = rank ? getRankTier(rank) : 'common';
+  const rankColors = {
+    legendary: 'from-yellow-500 to-amber-600 text-black',
+    epic: 'from-purple-500 to-pink-600 text-white',
+    rare: 'from-blue-500 to-cyan-600 text-white',
+    common: 'from-tmk-gray-600 to-tmk-gray-700 text-white',
+  };
 
   return (
     <div 
@@ -186,16 +206,37 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
           </div>
         </div>
 
-        {/* Right Side - Header + Traits Only */}
+        {/* Right Side - Header + Rank + Traits */}
         <div className="lg:w-3/5 p-6 flex flex-col">
-          {/* Header */}
+          {/* Header with Rank Badge */}
           <div className="mb-6">
             <p className="text-tmk-gray-400 text-sm uppercase tracking-wider mb-1">
               {COLLECTION_NAME}
             </p>
-            <h2 className="text-3xl font-bold text-white font-heading">
-              TMK #{tokenId}
-            </h2>
+            <div className="flex items-center gap-4 flex-wrap">
+              <h2 className="text-3xl font-bold text-white font-heading">
+                TMK #{tokenId}
+              </h2>
+              
+              {/* Rank Badge */}
+              {rank && !isLoading && (
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r ${rankColors[rankTier]} font-bold shadow-lg`}>
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  <span>Rank #{rank}</span>
+                  <span className="text-sm opacity-75">/ {totalSupply}</span>
+                </div>
+              )}
+              
+              {/* Rank Loading State */}
+              {isLoading && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-tmk-gray-800 animate-pulse">
+                  <div className="w-5 h-5 bg-tmk-gray-700 rounded"></div>
+                  <div className="w-20 h-5 bg-tmk-gray-700 rounded"></div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Traits Section */}
