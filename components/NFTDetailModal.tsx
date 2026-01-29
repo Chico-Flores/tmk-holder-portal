@@ -109,20 +109,24 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
 
   const explorerUrl = `${BLOCK_EXPLORER}/token/${CONTRACT_ADDRESS}?a=${tokenId}`;
 
-  // Determine rank tier for styling
+  // Determine rank tier for styling (1500 total NFTs)
   const getRankTier = (rank: number) => {
-    if (rank <= 50) return 'legendary'; // Top 50
-    if (rank <= 150) return 'epic';     // Top 10%
-    if (rank <= 375) return 'rare';     // Top 25%
-    return 'common';
+    if (rank <= 50) return 'legendary';   // Top 50 - Gold
+    if (rank <= 150) return 'epic';       // Top 10% - Purple
+    if (rank <= 375) return 'rare';       // Top 25% - Blue
+    if (rank <= 750) return 'uncommon';   // Top 50% - Green
+    if (rank <= 1200) return 'common';    // Top 80% - Teal
+    return 'basic';                        // Bottom 20% - Light gray
   };
 
-  const rankTier = rank ? getRankTier(rank) : 'common';
+  const rankTier = rank ? getRankTier(rank) : 'basic';
   const rankColors = {
-    legendary: 'from-yellow-500 to-amber-600 text-black',
-    epic: 'from-purple-500 to-pink-600 text-white',
-    rare: 'from-blue-500 to-cyan-600 text-white',
-    common: 'from-tmk-gray-600 to-tmk-gray-700 text-white',
+    legendary: 'from-yellow-400 to-amber-500 text-black',
+    epic: 'from-purple-500 to-pink-500 text-white',
+    rare: 'from-blue-500 to-cyan-500 text-white',
+    uncommon: 'from-emerald-500 to-green-600 text-white',
+    common: 'from-teal-600 to-cyan-700 text-white',
+    basic: 'from-slate-400 to-slate-500 text-white',
   };
 
   return (
