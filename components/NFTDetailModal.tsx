@@ -22,6 +22,7 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
   const [totalSupply, setTotalSupply] = useState<number>(1500);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
 
   // Fetch metadata when modal opens
   useEffect(() => {
@@ -52,10 +53,16 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
     fetchMetadata();
   }, [isOpen, tokenId]);
 
-  // Close on escape key
+  // Close on escape key (handles zoomed state first)
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (isImageZoomed) {
+          setIsImageZoomed(false);
+        } else {
+          onClose();
+        }
+      }
     };
 
     if (isOpen) {
@@ -67,7 +74,14 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, isImageZoomed, onClose]);
+
+  // Reset zoom state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsImageZoomed(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -134,6 +148,45 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm"
       onClick={onClose}
     >
+      {/* Image Zoom Overlay */}
+      {isImageZoomed && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/98 cursor-zoom-out"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsImageZoomed(false);
+          }}
+        >
+          {/* Close Zoom Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsImageZoomed(false);
+            }}
+            className="absolute top-4 right-4 p-2 text-white/70 hover:text-white 
+                       bg-tmk-gray-800 hover:bg-tmk-gray-700 rounded-full transition-colors z-10"
+            aria-label="Close zoom"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          
+          {/* Zoomed Image */}
+          <img
+            src={imageUrl}
+            alt={`TMK #${tokenId}`}
+            className="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Token ID label */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 px-4 py-2 rounded-full">
+            <span className="text-white font-semibold">TMK #{tokenId}</span>
+          </div>
+        </div>
+      )}
+
       {/* Close Button */}
       <button
         onClick={onClose}
@@ -154,12 +207,23 @@ export function NFTDetailModal({ isOpen, tokenId, imageUrl, walletAddress, onClo
       >
         {/* Left Side - Image + All Action Buttons */}
         <div className="lg:w-2/5 bg-tmk-dark p-4 flex flex-col">
-          <div className="relative aspect-square rounded-xl overflow-hidden bg-tmk-gray-800">
+          <div 
+            className="relative aspect-square rounded-xl overflow-hidden bg-tmk-gray-800 cursor-zoom-in group"
+            onClick={() => setIsImageZoomed(true)}
+          >
             <img
               src={imageUrl}
               alt={`TMK #${tokenId}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
+            {/* Zoom hint overlay */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <div className="bg-black/60 rounded-full p-3">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                </svg>
+              </div>
+            </div>
           </div>
           
           {/* All Action Buttons - Under Image */}
