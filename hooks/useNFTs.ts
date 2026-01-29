@@ -63,11 +63,17 @@ export function useNFTs(address: string | null) {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Use server-side API to fetch NFTs
-      const response = await fetch(`/api/nfts/${address}`);
+      // Fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s client timeout
+
+      const response = await fetch(`/api/nfts/${address}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         throw new Error(error.error || 'Failed to fetch NFTs');
       }
 
@@ -86,11 +92,19 @@ export function useNFTs(address: string | null) {
       });
     } catch (error: unknown) {
       console.error('Failed to fetch NFTs:', error);
-      const err = error as { message?: string };
+      const err = error as { name?: string; message?: string };
+      
+      let errorMessage = 'Failed to fetch NFTs. Please try again.';
+      if (err.name === 'AbortError') {
+        errorMessage = 'Request timed out. The blockchain might be slow. Please try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
       setState({
         nfts: [],
         isLoading: false,
-        error: err.message || 'Failed to fetch NFTs. Please try again.',
+        error: errorMessage,
       });
     } finally {
       isFetching.current = false;
@@ -111,7 +125,7 @@ export function useNFTs(address: string | null) {
 
   return {
     ...state,
-    isLoadingMetadata: false, // No longer needed with server-side fetch
+    isLoadingMetadata: false,
     loadedCount: state.nfts.length,
     totalCount: state.nfts.length,
     refetch: () => fetchNFTs(true),

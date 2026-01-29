@@ -9,10 +9,6 @@ const CONTRACT_ABI = [
   'function tokenURI(uint256 tokenId) external view returns (string)',
 ];
 
-// Simple in-memory cache (persists across requests in same server instance)
-const metadataCache = new Map<string, { data: unknown; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 // IPFS to HTTP conversion
 function ipfsToHttp(uri: string): string {
   if (!uri) return '';
@@ -26,21 +22,70 @@ function ipfsToHttp(uri: string): string {
   return uri;
 }
 
-// Delay helper
-const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
-
-// Fetch with timeout
-async function fetchWithTimeout(url: string, timeout: number = 10000): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
+// Fetch single NFT metadata with timeout
+async function fetchNFTMetadata(
+  contract: ethers.Contract,
+  tokenId: bigint,
+  timeoutMs: number = 5000
+): Promise<{
+  tokenId: number;
+  name: string;
+  description: string;
+  image: string;
+  rawImage: string;
+  attributes: unknown[];
+}> {
+  const tokenIdNum = Number(tokenId);
+  
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    return response;
+    // Create a promise that rejects after timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout')), timeoutMs);
+    });
+
+    // Fetch tokenURI with timeout
+    const tokenURI = await Promise.race([
+      contract.tokenURI(tokenId),
+      timeoutPromise,
+    ]) as string;
+
+    const metadataUrl = ipfsToHttp(tokenURI);
+    
+    // Fetch metadata with timeout
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 5000);
+    
+    try {
+      const response = await fetch(metadataUrl, { signal: controller.signal });
+      clearTimeout(fetchTimeout);
+      
+      if (response.ok) {
+        const metadata = await response.json();
+        return {
+          tokenId: tokenIdNum,
+          name: metadata.name || `TMK #${tokenIdNum}`,
+          description: metadata.description || '',
+          image: ipfsToHttp(metadata.image || ''),
+          rawImage: metadata.image || '',
+          attributes: metadata.attributes || [],
+        };
+      }
+    } catch {
+      clearTimeout(fetchTimeout);
+    }
   } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+    console.log(`Token ${tokenIdNum} fetch failed:`, error);
   }
+
+  // Return fallback
+  return {
+    tokenId: tokenIdNum,
+    name: `TMK #${tokenIdNum}`,
+    description: '',
+    image: '',
+    rawImage: '',
+    attributes: [],
+  };
 }
 
 export async function GET(
@@ -54,93 +99,36 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid address' }, { status: 400 });
   }
 
-  // Check cache
-  const cacheKey = address.toLowerCase();
-  const cached = metadataCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return NextResponse.json(cached.data);
-  }
-
   try {
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
-    // Get token IDs
+    // Get token IDs (this is fast)
     const tokenIds: bigint[] = await contract.tokensOfOwner(address);
 
     if (tokenIds.length === 0) {
-      const result = { nfts: [], count: 0 };
-      metadataCache.set(cacheKey, { data: result, timestamp: Date.now() });
-      return NextResponse.json(result);
+      return NextResponse.json({ nfts: [], count: 0 });
     }
 
-    // Fetch metadata one at a time with delays (more reliable)
-    const nfts = [];
-    
-    for (const tokenId of tokenIds) {
-      const tokenIdNum = Number(tokenId);
-      
-      try {
-        // Add delay between requests to avoid rate limiting
-        if (nfts.length > 0) {
-          await delay(200); // 200ms between each request
-        }
+    // Fetch all metadata in parallel with individual timeouts
+    const nftPromises = tokenIds.map(tokenId => 
+      fetchNFTMetadata(contract, tokenId, 5000)
+    );
 
-        const tokenURI = await contract.tokenURI(tokenId);
-        const metadataUrl = ipfsToHttp(tokenURI);
-        
-        try {
-          const response = await fetchWithTimeout(metadataUrl, 10000);
-          if (response.ok) {
-            const metadata = await response.json();
-            nfts.push({
-              tokenId: tokenIdNum,
-              name: metadata.name || `TMK #${tokenIdNum}`,
-              description: metadata.description || '',
-              image: ipfsToHttp(metadata.image || ''),
-              rawImage: metadata.image || '',
-              attributes: metadata.attributes || [],
-            });
-            continue;
-          }
-        } catch {
-          // IPFS fetch failed, use defaults
-        }
-        
-        // Fallback
-        nfts.push({
-          tokenId: tokenIdNum,
-          name: `TMK #${tokenIdNum}`,
-          description: '',
-          image: '',
-          rawImage: '',
-          attributes: [],
-        });
-      } catch (error) {
-        console.error(`Failed to fetch token ${tokenIdNum}:`, error);
-        nfts.push({
-          tokenId: tokenIdNum,
-          name: `TMK #${tokenIdNum}`,
-          description: '',
-          image: '',
-          rawImage: '',
-          attributes: [],
-        });
-      }
-    }
+    const nfts = await Promise.all(nftPromises);
 
     // Sort by token ID
     nfts.sort((a, b) => a.tokenId - b.tokenId);
 
-    const result = { nfts, count: nfts.length };
-    metadataCache.set(cacheKey, { data: result, timestamp: Date.now() });
-
-    return NextResponse.json(result);
+    return NextResponse.json({ nfts, count: nfts.length });
   } catch (error) {
     console.error('Failed to fetch NFTs:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch NFTs' },
+      { error: 'Failed to fetch NFTs. Please try again.' },
       { status: 500 }
     );
   }
 }
+
+// Set max duration for Vercel (hobby = 10s, pro = 60s)
+export const maxDuration = 10;
