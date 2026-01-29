@@ -56,12 +56,11 @@ export function ImageModal({ isOpen, imageUrl, title, onClose }: ImageModalProps
         className="relative max-w-[90vw] max-h-[85vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Use regular img tag for better IPFS compatibility */}
+        {/* Use regular img tag - no crossOrigin needed for display only */}
         <img
           src={imageUrl}
           alt={title}
           className="max-w-full max-h-[85vh] object-contain rounded-2xl"
-          crossOrigin="anonymous"
         />
       </div>
     </div>
