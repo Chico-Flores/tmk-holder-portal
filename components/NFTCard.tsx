@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { NFTMetadata } from '@/hooks/useNFTs';
 import { BLOCK_EXPLORER, CONTRACT_ADDRESS } from '@/lib/constants';
+import { getIpfsUrls } from '@/lib/utils';
 
 interface NFTCardProps {
   nft: NFTMetadata;
@@ -14,6 +15,28 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Get all possible image URLs for fallbacks
+  const imageUrls = nft.image ? getIpfsUrls(nft.image) : [];
+  const currentImageUrl = imageUrls[currentImageIndex] || '';
+
+  // Try next gateway if image fails
+  const handleImageError = () => {
+    if (currentImageIndex < imageUrls.length - 1) {
+      setCurrentImageIndex(prev => prev + 1);
+    } else {
+      setImageError(true);
+    }
+  };
+
+  // Reset image state when NFT changes
+  useEffect(() => {
+    setCurrentImageIndex(0);
+    setImageError(false);
+    setImageLoaded(false);
+  }, [nft.tokenId, nft.image]);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -45,19 +68,56 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
 
   const explorerUrl = `${BLOCK_EXPLORER}/token/${CONTRACT_ADDRESS}?a=${nft.tokenId}`;
 
+  // Show skeleton if NFT is still loading
+  if (nft.isLoading) {
+    return (
+      <div className="bg-tmk-gray-900 border border-tmk-gray-800 rounded-2xl overflow-hidden">
+        {/* Image Skeleton */}
+        <div className="relative aspect-square bg-tmk-dark">
+          <div className="absolute inset-0 animate-shimmer" />
+          {/* Token ID Badge */}
+          <div className="absolute top-3 right-3 px-2 py-1 bg-black/70 backdrop-blur-sm 
+                          rounded-lg text-sm font-mono text-white">
+            #{nft.tokenId}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          <h3 className="text-white font-bold font-heading mb-3">
+            TMK #{nft.tokenId}
+          </h3>
+          <div className="flex gap-2">
+            <div className="flex-1 h-10 bg-tmk-gray-800 rounded-xl animate-pulse" />
+            <div className="w-10 h-10 bg-tmk-gray-800 rounded-xl animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="group bg-tmk-gray-900 border border-tmk-gray-800 rounded-2xl overflow-hidden
                     transition-all duration-300 hover:border-tmk-red/50 hover:scale-[1.02]">
       {/* Image Container */}
       <div className="relative aspect-square bg-tmk-dark">
-        {nft.image && !imageError ? (
+        {/* Loading shimmer */}
+        {!imageLoaded && !imageError && currentImageUrl && (
+          <div className="absolute inset-0 animate-shimmer z-10" />
+        )}
+
+        {currentImageUrl && !imageError ? (
           <Image
-            src={nft.image}
+            src={currentImageUrl}
             alt={nft.name}
             fill
-            className="object-cover"
-            onError={() => setImageError(true)}
+            className={`object-cover transition-opacity duration-300 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            onError={handleImageError}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            unoptimized // Skip Next.js optimization for IPFS images
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -73,7 +133,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
 
         {/* Token ID Badge */}
         <div className="absolute top-3 right-3 px-2 py-1 bg-black/70 backdrop-blur-sm 
-                        rounded-lg text-sm font-mono text-white">
+                        rounded-lg text-sm font-mono text-white z-20">
           #{nft.tokenId}
         </div>
       </div>

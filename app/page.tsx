@@ -23,9 +23,21 @@ export default function Home() {
     switchNetwork,
   } = useWallet();
 
-  const { nfts, isLoading, error: nftError } = useNFTs(
+  const { 
+    nfts, 
+    isLoading, 
+    isLoadingMetadata,
+    error: nftError,
+    loadedCount,
+    totalCount,
+  } = useNFTs(
     isConnected && isCorrectNetwork ? address : null
   );
+
+  // Show loading only during initial token fetch, not metadata loading
+  const showInitialLoading = isLoading && nfts.length === 0;
+  const showNFTs = !isLoading && nfts.length > 0;
+  const showEmpty = !isLoading && nfts.length === 0 && !isLoadingMetadata;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -89,16 +101,35 @@ export default function Home() {
         {/* Connected and Correct Network */}
         {isConnected && isCorrectNetwork && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* Loading State */}
-            {isLoading && <LoadingState />}
+            {/* Initial Loading State (before we know NFT count) */}
+            {showInitialLoading && (
+              <LoadingState loadedCount={loadedCount} totalCount={totalCount} />
+            )}
 
             {/* Empty State */}
-            {!isLoading && nfts.length === 0 && <EmptyState />}
+            {showEmpty && <EmptyState />}
 
-            {/* NFTs Found */}
-            {!isLoading && nfts.length > 0 && (
+            {/* NFTs Found - Show immediately with loading states */}
+            {showNFTs && (
               <>
                 <StatsBar nftCount={nfts.length} />
+                
+                {/* Loading progress indicator */}
+                {isLoadingMetadata && totalCount > 0 && (
+                  <div className="mb-6 p-4 bg-tmk-gray-900 border border-tmk-gray-800 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-tmk-gray-400 text-sm">Loading NFT details...</span>
+                      <span className="text-white text-sm font-mono">{loadedCount}/{totalCount}</span>
+                    </div>
+                    <div className="h-1.5 bg-tmk-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-tmk-red transition-all duration-300 ease-out"
+                        style={{ width: `${Math.round((loadedCount / totalCount) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 <NFTGrid nfts={nfts} walletAddress={address!} />
               </>
             )}
