@@ -65,16 +65,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update user profile
-    const updateData: Record<string, unknown> = {};
-    
-    if (profile_nft_id !== undefined) {
-      updateData.profile_nft_id = profile_nft_id;
-    }
-    
-    if (twitter_handle !== undefined) {
-      updateData.twitter_handle = cleanTwitterHandle;
-    }
+    // Build update data - always include both fields to ensure they're set
+    const updateData: Record<string, unknown> = {
+      profile_nft_id: profile_nft_id ?? null,
+      twitter_handle: cleanTwitterHandle,
+    };
+
+    console.log('Updating profile for:', normalizedAddress, 'with data:', updateData);
 
     const { data, error } = await supabase
       .from('users')
@@ -86,11 +83,20 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error updating profile:', error);
       return NextResponse.json(
-        { error: 'Failed to update profile' },
+        { error: 'Failed to update profile: ' + error.message },
         { status: 500 }
       );
     }
 
+    if (!data) {
+      console.error('No data returned after profile update');
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    console.log('Profile updated successfully:', data);
     return NextResponse.json({ user: data });
   } catch (error) {
     console.error('Profile update error:', error);

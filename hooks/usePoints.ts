@@ -140,7 +140,8 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
         return { success: false, error: data.error || 'Failed to update username' };
       }
 
-      // Update local state
+      // Don't refetch here - let updateProfile handle the final refetch
+      // Just update local state optimistically
       if (data.user) {
         setUser(prev => prev ? { ...prev, ...data.user } : null);
       }
@@ -168,17 +169,15 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
         return { success: false, error: data.error || 'Failed to update profile' };
       }
 
-      // Update local state
-      if (data.user) {
-        setUser(prev => prev ? { ...prev, ...data.user } : null);
-      }
+      // Refetch all user data to ensure we have the latest from database
+      await fetchUserData();
 
       return { success: true };
     } catch (err) {
       console.error('Update profile error:', err);
       return { success: false, error: 'Failed to update profile' };
     }
-  }, [walletAddress]);
+  }, [walletAddress, fetchUserData]);
 
   // Auto-fetch when wallet changes
   useEffect(() => {
