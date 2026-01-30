@@ -1,40 +1,38 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || '';
-
-// Lazy initialization to avoid build-time errors
-let _supabase: SupabaseClient | null = null;
-let _supabaseAdmin: SupabaseClient | null = null;
-
 // Client for browser/public operations
+// Creates a fresh client each request to avoid stale data in serverless environments
 export const getSupabase = (): SupabaseClient => {
-  if (!_supabase) {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase URL and Anon Key are required');
-    }
-    _supabase = createClient(supabaseUrl, supabaseAnonKey);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  
+  if (!url || !anonKey) {
+    throw new Error('Supabase URL and Anon Key are required');
   }
-  return _supabase;
+  
+  return createClient(url, anonKey);
 };
 
 // Admin client for server-side operations (cron jobs, etc.)
+// Creates a fresh client each request to avoid stale data in serverless environments
 export const getSupabaseAdmin = (): SupabaseClient => {
-  if (!_supabaseAdmin) {
-    if (!supabaseUrl) {
-      throw new Error('Supabase URL is required');
-    }
-    const key = supabaseServiceKey || supabaseAnonKey;
-    if (!key) {
-      throw new Error('Supabase key is required');
-    }
-    _supabaseAdmin = createClient(supabaseUrl, key);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY || '';
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  
+  if (!url) {
+    throw new Error('Supabase URL is required');
   }
-  return _supabaseAdmin;
+  
+  const key = serviceKey || anonKey;
+  if (!key) {
+    throw new Error('Supabase key is required');
+  }
+  
+  return createClient(url, key);
 };
 
-// Legacy exports for backward compatibility (lazy loaded)
+// Legacy exports for backward compatibility
 export const supabase = { get client() { return getSupabase(); } };
 export const supabaseAdmin = { get client() { return getSupabaseAdmin(); } };
 
