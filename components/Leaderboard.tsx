@@ -108,7 +108,10 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className={`font-medium ${isCurrentUser ? 'text-tmk-red' : 'text-white'}`}>
-                        {isCurrentUser ? 'You' : formatWalletAddress(user.wallet_address)}
+                        {isCurrentUser 
+                          ? (user.username || 'You')
+                          : (user.username || formatWalletAddress(user.wallet_address))
+                        }
                       </span>
                       {isCurrentUser && (
                         <span className="text-xs bg-tmk-red/20 text-tmk-red px-2 py-0.5 rounded">
@@ -116,7 +119,9 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
                         </span>
                       )}
                     </div>
-                    <span className="text-tmk-gray-500 text-sm">{user.nftCount} NFTs</span>
+                    <span className="text-tmk-gray-500 text-sm">
+                      {user.nftCount} NFTs {!user.username && `• ${formatWalletAddress(user.wallet_address)}`}
+                    </span>
                   </div>
                 </div>
                 <div className="text-right">

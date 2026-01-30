@@ -122,7 +122,8 @@ export default function Home() {
                 {!isLoading && nfts.length > 0 && (
                   <>
                     <StatsBar nftCount={nfts.length} />
-                    <NFTGrid nfts={nfts} walletAddress={address!} />
+                    {/* Key forces clean remount when switching tabs */}
+                    <NFTGrid key={`nfts-${address}`} nfts={nfts} walletAddress={address!} />
                   </>
                 )}
               </>

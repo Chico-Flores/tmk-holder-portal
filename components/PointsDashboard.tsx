@@ -10,31 +10,83 @@ interface PointsDashboardProps {
 }
 
 export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps) {
-  const { user, holdings, pointsHistory, stats, isLoading, error, login } = usePoints(walletAddress);
+  const { user, holdings, pointsHistory, stats, isLoading, error, login, refetch, updateUsername } = usePoints(walletAddress);
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeBonus, setWelcomeBonus] = useState(0);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
 
   // Auto-login when user doesn't exist
   useEffect(() => {
     async function registerUser() {
-      if (!isLoading && !user && walletAddress) {
+      if (!isLoading && !user && walletAddress && !isRegistering) {
+        setIsRegistering(true);
         const result = await login();
         if (result?.isNewUser && result.bonusAwarded > 0) {
           setWelcomeBonus(result.bonusAwarded);
           setShowWelcome(true);
           setTimeout(() => setShowWelcome(false), 5000);
         }
+        setIsRegistering(false);
       }
     }
     registerUser();
-  }, [isLoading, user, walletAddress, login]);
+  }, [isLoading, user, walletAddress, login, isRegistering]);
 
-  if (isLoading) {
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setIsRefreshing(false);
+  };
+
+  const handleSaveUsername = async () => {
+    setUsernameError(null);
+    setIsSavingUsername(true);
+    
+    const result = await updateUsername(usernameInput);
+    
+    if (result.success) {
+      setIsEditingUsername(false);
+    } else {
+      setUsernameError(result.error || 'Failed to save username');
+    }
+    
+    setIsSavingUsername(false);
+  };
+
+  const startEditingUsername = () => {
+    setUsernameInput(user?.username || '');
+    setUsernameError(null);
+    setIsEditingUsername(true);
+  };
+
+  if (isLoading || isRegistering) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="bg-tmk-gray-900 rounded-2xl p-8 border border-tmk-gray-800">
-          <div className="h-8 bg-tmk-gray-800 rounded w-48 mx-auto mb-4"></div>
-          <div className="h-16 bg-tmk-gray-800 rounded w-32 mx-auto"></div>
+      <div className="space-y-6">
+        <div className="bg-tmk-gray-900 rounded-2xl p-8 border border-tmk-gray-800 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-tmk-red border-t-transparent rounded-full animate-spin"></div>
+            <div>
+              <p className="text-white font-medium">
+                {isRegistering ? 'Registering your wallet...' : 'Loading your points...'}
+              </p>
+              <p className="text-tmk-gray-400 text-sm mt-1">
+                {isRegistering ? 'Syncing your NFT holdings' : 'Please wait'}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-tmk-gray-900 rounded-xl p-6 border border-tmk-gray-800 animate-pulse">
+              <div className="h-4 bg-tmk-gray-800 rounded w-20 mb-2"></div>
+              <div className="h-8 bg-tmk-gray-800 rounded w-16"></div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -72,7 +124,80 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
       )}
 
       {/* Main Points Display */}
-      <div className="bg-tmk-gray-900 rounded-2xl p-8 border border-tmk-gray-800 text-center">
+      <div className="bg-tmk-gray-900 rounded-2xl p-8 border border-tmk-gray-800 text-center relative">
+        {/* Refresh Button */}
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="absolute top-4 right-4 p-2 text-tmk-gray-400 hover:text-white 
+                     hover:bg-tmk-gray-800 rounded-lg transition-colors disabled:opacity-50"
+          title="Refresh points"
+        >
+          <svg 
+            className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+        
+        {/* Username Display/Editor */}
+        {!isEditingUsername ? (
+          <div className="flex items-center justify-center gap-2 mb-4">
+            {user?.username ? (
+              <span className="text-xl font-semibold text-white">{user.username}</span>
+            ) : (
+              <span className="text-tmk-gray-500 italic">No username set</span>
+            )}
+            <button
+              onClick={startEditingUsername}
+              className="p-1 text-tmk-gray-400 hover:text-white transition-colors"
+              title="Edit username"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <div className="mb-4">
+            <div className="flex items-center justify-center gap-2 max-w-xs mx-auto">
+              <input
+                type="text"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="Enter username"
+                maxLength={20}
+                className="flex-1 px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
+                           text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
+              />
+              <button
+                onClick={handleSaveUsername}
+                disabled={isSavingUsername}
+                className="px-3 py-2 bg-tmk-red hover:bg-tmk-red-hover text-white rounded-lg
+                           disabled:opacity-50 transition-colors"
+              >
+                {isSavingUsername ? '...' : 'Save'}
+              </button>
+              <button
+                onClick={() => setIsEditingUsername(false)}
+                className="px-3 py-2 bg-tmk-gray-700 hover:bg-tmk-gray-600 text-white rounded-lg
+                           transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            {usernameError && (
+              <p className="text-red-400 text-sm mt-2">{usernameError}</p>
+            )}
+            <p className="text-tmk-gray-500 text-xs mt-2">3-20 characters, letters, numbers, _ and - only</p>
+          </div>
+        )}
+        
         <h2 className="text-tmk-gray-400 text-lg mb-2">YOUR POINTS</h2>
         <div className="text-5xl sm:text-6xl font-bold text-white mb-4 font-heading">
           {formatPoints(totalPoints)}

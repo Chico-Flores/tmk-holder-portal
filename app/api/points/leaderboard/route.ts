@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     // Get top users
     const { data: topUsers, error } = await supabase
       .from('users')
-      .select('wallet_address, total_points, created_at')
+      .select('wallet_address, total_points, created_at, username')
       .order('total_points', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         // User not in current page, fetch their data
         const { data: user } = await supabase
           .from('users')
-          .select('wallet_address, total_points, created_at')
+          .select('wallet_address, total_points, created_at, username')
           .eq('wallet_address', walletAddress)
           .single();
 

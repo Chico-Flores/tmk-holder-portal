@@ -30,6 +30,7 @@ interface UsePointsReturn {
   error: string | null;
   refetch: () => Promise<void>;
   login: () => Promise<{ isNewUser: boolean; bonusAwarded: number } | null>;
+  updateUsername: (username: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function usePoints(walletAddress: string | null): UsePointsReturn {
@@ -110,6 +111,34 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
     }
   }, [walletAddress, fetchUserData]);
 
+  const updateUsername = useCallback(async (username: string): Promise<{ success: boolean; error?: string }> => {
+    if (!walletAddress) return { success: false, error: 'No wallet connected' };
+
+    try {
+      const response = await fetch('/api/points/username', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress, username }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to update username' };
+      }
+
+      // Update local state
+      if (data.user) {
+        setUser(prev => prev ? { ...prev, ...data.user } : null);
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Update username error:', err);
+      return { success: false, error: 'Failed to update username' };
+    }
+  }, [walletAddress]);
+
   // Auto-fetch when wallet changes
   useEffect(() => {
     fetchUserData();
@@ -124,6 +153,7 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
     error,
     refetch: fetchUserData,
     login,
+    updateUsername,
   };
 }
 
@@ -134,6 +164,7 @@ interface LeaderboardUser {
   created_at: string;
   rank: number;
   nftCount: number;
+  username: string | null;
 }
 
 interface UseLeaderboardReturn {

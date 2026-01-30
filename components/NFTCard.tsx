@@ -22,7 +22,6 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [allGatewaysFailed, setAllGatewaysFailed] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const [usingR2, setUsingR2] = useState(true);
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -32,15 +31,8 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
   const ipfsUrls = getIpfsUrls(nft.rawImage || nft.image);
   
   // Use R2 first, then fall back to IPFS gateways
-  const currentImageUrl = isMounted 
-    ? (usingR2 && r2ImageUrl ? r2ImageUrl : (ipfsUrls[currentGatewayIndex] || ''))
-    : '';
+  const currentImageUrl = usingR2 && r2ImageUrl ? r2ImageUrl : (ipfsUrls[currentGatewayIndex] || '');
   const hasValidImage = (r2ImageUrl || ipfsUrls.length > 0) && !allGatewaysFailed;
-
-  // Mark as mounted (client-side only)
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Try next source if image fails (R2 -> IPFS gateways)
   const handleImageError = useCallback(() => {
@@ -61,13 +53,11 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
 
   // Reset image state when NFT changes
   useEffect(() => {
-    if (isMounted) {
-      setUsingR2(true);
-      setCurrentGatewayIndex(0);
-      setAllGatewaysFailed(false);
-      setImageLoaded(false);
-    }
-  }, [nft.tokenId, nft.rawImage, isMounted]);
+    setUsingR2(true);
+    setCurrentGatewayIndex(0);
+    setAllGatewaysFailed(false);
+    setImageLoaded(false);
+  }, [nft.tokenId, nft.rawImage]);
 
   const handleDownload3D = async () => {
     setIsDownloading(true);
@@ -151,13 +141,13 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
           className={`relative aspect-square bg-tmk-dark ${hasValidImage && imageLoaded ? 'cursor-pointer' : ''}`}
           onClick={() => hasValidImage && imageLoaded && setIsModalOpen(true)}
         >
-          {/* Loading shimmer - only show when mounted and loading */}
-          {isMounted && !imageLoaded && hasValidImage && currentImageUrl && (
+          {/* Loading shimmer */}
+          {!imageLoaded && hasValidImage && currentImageUrl && (
             <div className="absolute inset-0 animate-shimmer z-10" />
           )}
 
-          {/* Image - only render on client */}
-          {isMounted && hasValidImage && currentImageUrl ? (
+          {/* Image */}
+          {hasValidImage && currentImageUrl ? (
             <>
               <img
                 ref={imgRef}
@@ -191,7 +181,7 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
                 height={80}
                 className="opacity-30"
               />
-              {isMounted && allGatewaysFailed && (
+              {allGatewaysFailed && (
                 <button
                   onClick={handleRetryImage}
                   className="text-xs text-tmk-gray-400 hover:text-white underline"
@@ -285,16 +275,14 @@ export function NFTCard({ nft, walletAddress }: NFTCardProps) {
         </div>
       </div>
 
-      {/* NFT Detail Modal - only render when mounted */}
-      {isMounted && (
-        <NFTDetailModal
-          isOpen={isModalOpen}
-          tokenId={nft.tokenId}
-          imageUrl={currentImageUrl}
-          walletAddress={walletAddress}
-          onClose={() => setIsModalOpen(false)}
-        />
-      )}
+      {/* NFT Detail Modal */}
+      <NFTDetailModal
+        isOpen={isModalOpen}
+        tokenId={nft.tokenId}
+        imageUrl={currentImageUrl}
+        walletAddress={walletAddress}
+        onClose={() => setIsModalOpen(false)}
+      />
     </>
   );
 }
