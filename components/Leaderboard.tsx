@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useLeaderboard } from '@/hooks/usePoints';
 import { formatPoints, formatWalletAddress } from '@/lib/points';
+import { UserProfileModal } from './UserProfileModal';
 
 // R2 public URL for images
 const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
@@ -19,6 +21,12 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
     isLoading, 
     error 
   } = useLeaderboard(walletAddress);
+
+  const [selectedUserWallet, setSelectedUserWallet] = useState<string | null>(null);
+
+  const handleUserClick = (userWallet: string) => {
+    setSelectedUserWallet(userWallet);
+  };
 
   if (isLoading) {
     return (
@@ -107,9 +115,10 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
           const rankStyle = getRankStyle(user.rank);
 
           return (
-            <div
+            <button
               key={user.wallet_address}
-              className={`rounded-xl p-4 border transition-all ${rankStyle} ${
+              onClick={() => handleUserClick(user.wallet_address)}
+              className={`w-full rounded-xl p-4 border transition-all cursor-pointer hover:bg-tmk-gray-800/50 ${rankStyle} ${
                 isCurrentUser ? 'ring-2 ring-tmk-red' : ''
               }`}
             >
@@ -188,7 +197,7 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
                   </div>
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -226,6 +235,13 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
           <p className="text-tmk-gray-400">Be the first to earn points and claim the top spot!</p>
         </div>
       )}
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={selectedUserWallet !== null}
+        onClose={() => setSelectedUserWallet(null)}
+        walletAddress={selectedUserWallet}
+      />
     </div>
   );
 }

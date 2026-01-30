@@ -19,10 +19,6 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
   const [welcomeBonus, setWelcomeBonus] = useState(0);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [usernameInput, setUsernameInput] = useState('');
-  const [usernameError, setUsernameError] = useState<string | null>(null);
-  const [isSavingUsername, setIsSavingUsername] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
 
   // Auto-login only when we've fetched and confirmed user doesn't exist
@@ -49,28 +45,15 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
     setIsRefreshing(false);
   };
 
-  const handleSaveUsername = async () => {
-    setUsernameError(null);
-    setIsSavingUsername(true);
-    
-    const result = await updateUsername(usernameInput);
-    
-    if (result.success) {
-      setIsEditingUsername(false);
-    } else {
-      setUsernameError(result.error || 'Failed to save username');
+  const handleSaveProfile = async (username: string | null, profileNftId: number | null, twitterHandle: string | null) => {
+    // Save username if changed
+    if (username !== user?.username) {
+      const usernameResult = await updateUsername(username || '');
+      if (!usernameResult.success) {
+        return usernameResult;
+      }
     }
-    
-    setIsSavingUsername(false);
-  };
-
-  const startEditingUsername = () => {
-    setUsernameInput(user?.username || '');
-    setUsernameError(null);
-    setIsEditingUsername(true);
-  };
-
-  const handleSaveProfile = async (profileNftId: number | null, twitterHandle: string | null) => {
+    // Save profile settings
     return await updateProfile({ profile_nft_id: profileNftId, twitter_handle: twitterHandle });
   };
 
@@ -188,81 +171,39 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
           </div>
 
           {/* Username and Twitter */}
-          {!isEditingUsername ? (
-            <div className="flex flex-col items-center gap-1">
-              <div className="flex items-center gap-2">
-                {user?.username ? (
-                  <span className="text-xl font-semibold text-white">{user.username}</span>
-                ) : (
-                  <span className="text-tmk-gray-500 italic">No username set</span>
-                )}
-                <button
-                  onClick={startEditingUsername}
-                  className="p-1 text-tmk-gray-400 hover:text-white transition-colors"
-                  title="Edit username"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-              </div>
-              {user?.twitter_handle && (
-                <a
-                  href={`https://x.com/${user.twitter_handle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-tmk-gray-400 hover:text-white transition-colors text-sm"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
-                  <span>@{user.twitter_handle}</span>
-                </a>
-              )}
-              {/* Profile Settings Button */}
-              <button
-                onClick={() => setShowProfileSettings(true)}
-                className="mt-2 px-3 py-1.5 text-sm text-tmk-gray-400 hover:text-white 
-                           border border-tmk-gray-700 hover:border-tmk-gray-600 rounded-lg transition-colors"
+          <div className="flex flex-col items-center gap-1">
+            {user?.username ? (
+              <span className="text-xl font-semibold text-white">{user.username}</span>
+            ) : (
+              <span className="text-tmk-gray-500 italic">No username set</span>
+            )}
+            {user?.twitter_handle && (
+              <a
+                href={`https://x.com/${user.twitter_handle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-tmk-gray-400 hover:text-white transition-colors text-sm"
               >
-                Edit Profile
-              </button>
-            </div>
-          ) : (
-            <div className="w-full max-w-xs">
-              <div className="flex items-center justify-center gap-2">
-                <input
-                  type="text"
-                  value={usernameInput}
-                  onChange={(e) => setUsernameInput(e.target.value)}
-                  placeholder="Enter username"
-                  maxLength={20}
-                  className="flex-1 px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
-                             text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
-                />
-                <button
-                  onClick={handleSaveUsername}
-                  disabled={isSavingUsername}
-                  className="px-3 py-2 bg-tmk-red hover:bg-tmk-red-hover text-white rounded-lg
-                             disabled:opacity-50 transition-colors"
-                >
-                  {isSavingUsername ? '...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => setIsEditingUsername(false)}
-                  className="px-3 py-2 bg-tmk-gray-700 hover:bg-tmk-gray-600 text-white rounded-lg
-                             transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-              {usernameError && (
-                <p className="text-red-400 text-sm mt-2 text-center">{usernameError}</p>
-              )}
-              <p className="text-tmk-gray-500 text-xs mt-2 text-center">3-20 characters, letters, numbers, _ and - only</p>
-            </div>
-          )}
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <span>@{user.twitter_handle}</span>
+              </a>
+            )}
+            {/* Edit Profile Button */}
+            <button
+              onClick={() => setShowProfileSettings(true)}
+              className="mt-2 px-4 py-1.5 text-sm text-tmk-gray-400 hover:text-white 
+                         border border-tmk-gray-700 hover:border-tmk-gray-600 rounded-lg transition-colors
+                         flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Edit Profile
+            </button>
+          </div>
         </div>
         
         <h2 className="text-tmk-gray-400 text-lg mb-2">YOUR POINTS</h2>
@@ -400,6 +341,7 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
         isOpen={showProfileSettings}
         onClose={() => setShowProfileSettings(false)}
         holdings={holdings}
+        currentUsername={user?.username || null}
         currentProfileNftId={user?.profile_nft_id || null}
         currentTwitterHandle={user?.twitter_handle || null}
         onSave={handleSaveProfile}

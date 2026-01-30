@@ -4,10 +4,11 @@ import { calculateDailyPoints, calculateDaysHeld, getNextMilestone } from '@/lib
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { wallet: string } }
+  { params }: { params: Promise<{ wallet: string }> }
 ) {
   try {
-    const walletAddress = params.wallet.toLowerCase();
+    const { wallet } = await params;
+    const walletAddress = wallet.toLowerCase();
     const supabase = getSupabaseAdmin();
 
     // Get user data (explicitly list fields to ensure all profile fields are included)

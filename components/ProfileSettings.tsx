@@ -10,19 +10,22 @@ interface ProfileSettingsProps {
   isOpen: boolean;
   onClose: () => void;
   holdings: Holding[];
+  currentUsername: string | null;
   currentProfileNftId: number | null;
   currentTwitterHandle: string | null;
-  onSave: (profileNftId: number | null, twitterHandle: string | null) => Promise<{ success: boolean; error?: string }>;
+  onSave: (username: string | null, profileNftId: number | null, twitterHandle: string | null) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function ProfileSettings({
   isOpen,
   onClose,
   holdings,
+  currentUsername,
   currentProfileNftId,
   currentTwitterHandle,
   onSave,
 }: ProfileSettingsProps) {
+  const [username, setUsername] = useState(currentUsername || '');
   const [selectedNftId, setSelectedNftId] = useState<number | null>(currentProfileNftId);
   const [twitterHandle, setTwitterHandle] = useState(currentTwitterHandle || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -31,11 +34,12 @@ export function ProfileSettings({
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
+      setUsername(currentUsername || '');
       setSelectedNftId(currentProfileNftId);
       setTwitterHandle(currentTwitterHandle || '');
       setError(null);
     }
-  }, [isOpen, currentProfileNftId, currentTwitterHandle]);
+  }, [isOpen, currentUsername, currentProfileNftId, currentTwitterHandle]);
 
   if (!isOpen) return null;
 
@@ -43,7 +47,11 @@ export function ProfileSettings({
     setError(null);
     setIsSaving(true);
 
-    const result = await onSave(selectedNftId, twitterHandle || null);
+    const result = await onSave(
+      username.trim() || null, 
+      selectedNftId, 
+      twitterHandle.trim() || null
+    );
 
     if (result.success) {
       onClose();
@@ -73,7 +81,7 @@ export function ProfileSettings({
       <div className="relative bg-tmk-gray-900 border border-tmk-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-tmk-gray-800">
-          <h2 className="text-xl font-bold text-white">Profile Settings</h2>
+          <h2 className="text-xl font-bold text-white">Edit Profile</h2>
           <button
             onClick={onClose}
             className="p-2 text-tmk-gray-400 hover:text-white transition-colors"
@@ -86,9 +94,50 @@ export function ProfileSettings({
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {/* Profile Picture Section */}
+          {/* 1. Username Section (at top) */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-tmk-gray-400 mb-3">
+            <label className="block text-sm font-medium text-tmk-gray-400 mb-2">
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter a display name"
+              maxLength={20}
+              className="w-full px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
+                         text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
+            />
+            <p className="text-tmk-gray-500 text-xs mt-2">
+              3-20 characters, letters, numbers, _ and - only
+            </p>
+          </div>
+
+          {/* 2. Twitter Handle Section (in middle) */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-tmk-gray-400 mb-2">
+              Twitter / X Handle
+            </label>
+            <div className="flex items-center">
+              <span className="text-tmk-gray-500 mr-2">@</span>
+              <input
+                type="text"
+                value={twitterHandle}
+                onChange={(e) => setTwitterHandle(e.target.value.replace(/^@/, ''))}
+                placeholder="yourhandle"
+                maxLength={15}
+                className="flex-1 px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
+                           text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
+              />
+            </div>
+            <p className="text-tmk-gray-500 text-xs mt-2">
+              Your Twitter handle will be displayed on the leaderboard
+            </p>
+          </div>
+
+          {/* 3. Profile Picture Section (at bottom) */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-tmk-gray-400 mb-2">
               Profile Picture
             </label>
             <p className="text-tmk-gray-500 text-sm mb-4">
@@ -96,12 +145,12 @@ export function ProfileSettings({
             </p>
 
             {ownedNfts.length === 0 ? (
-              <p className="text-tmk-gray-500 text-center py-4">
+              <p className="text-tmk-gray-500 text-center py-4 bg-tmk-gray-800/50 rounded-lg">
                 No NFTs found. Hold TMK NFTs to use them as your profile picture.
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="grid grid-cols-4 gap-3 mb-4 max-h-48 overflow-y-auto p-1">
                   {ownedNfts.map((holding) => {
                     const imageUrl = R2_PUBLIC_URL 
                       ? `${R2_PUBLIC_URL}/images/${holding.token_id}.png`
@@ -148,28 +197,6 @@ export function ProfileSettings({
                 )}
               </>
             )}
-          </div>
-
-          {/* Twitter Handle Section */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-tmk-gray-400 mb-2">
-              Twitter / X Handle
-            </label>
-            <div className="flex items-center">
-              <span className="text-tmk-gray-500 mr-2">@</span>
-              <input
-                type="text"
-                value={twitterHandle}
-                onChange={(e) => setTwitterHandle(e.target.value.replace(/^@/, ''))}
-                placeholder="yourhandle"
-                maxLength={15}
-                className="flex-1 px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
-                           text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
-              />
-            </div>
-            <p className="text-tmk-gray-500 text-xs mt-2">
-              Your Twitter handle will be displayed on the leaderboard
-            </p>
           </div>
 
           {/* Error Message */}
