@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { calculateDailyPoints, calculateDaysHeld, getNextMilestone } from '@/lib/points';
 
 export async function GET(
@@ -8,9 +8,10 @@ export async function GET(
 ) {
   try {
     const walletAddress = params.wallet.toLowerCase();
+    const supabase = getSupabaseAdmin();
 
     // Get user data
-    const { data: user, error: userError } = await supabaseAdmin
+    const { data: user, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('wallet_address', walletAddress)
@@ -24,7 +25,7 @@ export async function GET(
     }
 
     // Get current holdings
-    const { data: holdings } = await supabaseAdmin
+    const { data: holdings } = await supabase
       .from('holdings')
       .select('*')
       .eq('wallet_address', walletAddress)
@@ -32,7 +33,7 @@ export async function GET(
       .order('first_seen_at', { ascending: true });
 
     // Get points history (last 20 entries)
-    const { data: pointsHistory } = await supabaseAdmin
+    const { data: pointsHistory } = await supabase
       .from('points_log')
       .select('*')
       .eq('wallet_address', walletAddress)
@@ -40,12 +41,12 @@ export async function GET(
       .limit(20);
 
     // Get user rank
-    const { count: higherRankedCount } = await supabaseAdmin
+    const { count: higherRankedCount } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true })
       .gt('total_points', user.total_points);
 
-    const { count: totalUsers } = await supabaseAdmin
+    const { count: totalUsers } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
 

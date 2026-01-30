@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { POINTS_CONFIG, POINT_SOURCES, calculateDailyPoints, calculateDaysHeld } from '@/lib/points';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '@/lib/constants';
+
+// Mark as dynamic to prevent build-time execution
+export const dynamic = 'force-dynamic';
 
 // Verify cron secret to prevent unauthorized access
 function verifyCronSecret(request: NextRequest): boolean {
@@ -26,11 +29,12 @@ export async function GET(request: NextRequest) {
   try {
     console.log('Starting daily points distribution...');
     
+    const supabase = getSupabaseAdmin();
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
     // Get all users
-    const { data: users, error: usersError } = await supabaseAdmin
+    const { data: users, error: usersError } = await supabase
       .from('users')
       .select('wallet_address, total_points');
 
@@ -57,7 +61,7 @@ export async function GET(request: NextRequest) {
         const currentTokenIds = tokenIds.map((id: bigint) => Number(id));
 
         // Get existing holdings from DB
-        const { data: existingHoldings } = await supabaseAdmin
+        const { data: existingHoldings } = await supabase
           .from('holdings')
           .select('*')
           .eq('wallet_address', user.wallet_address);
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
         // Mark sold NFTs as not current
         const soldTokenIds = existingTokenIds.filter(id => !currentTokenIds.includes(id));
         if (soldTokenIds.length > 0) {
-          await supabaseAdmin
+          await supabase
             .from('holdings')
             .update({ is_current: false, last_seen_at: now })
             .eq('wallet_address', user.wallet_address)
@@ -83,7 +87,7 @@ export async function GET(request: NextRequest) {
 
           if (existing) {
             // Update existing holding
-            await supabaseAdmin
+            await supabase
               .from('holdings')
               .update({ is_current: true, last_seen_at: now })
               .eq('id', existing.id);
@@ -91,7 +95,7 @@ export async function GET(request: NextRequest) {
             currentHoldings.push(existing);
           } else {
             // New holding
-            const { data: newHolding } = await supabaseAdmin
+            const { data: newHolding } = await supabase
               .from('holdings')
               .insert({
                 wallet_address: user.wallet_address,
@@ -115,7 +119,7 @@ export async function GET(request: NextRequest) {
           dailyPointsTotal = calculateDailyPoints(nftCount);
 
           // Award daily holding points
-          await supabaseAdmin.from('points_log').insert({
+          await supabase.from('points_log').insert({
             wallet_address: user.wallet_address,
             amount: dailyPointsTotal,
             source: POINT_SOURCES.DAILY_HOLDING,
@@ -136,7 +140,7 @@ export async function GET(request: NextRequest) {
             const points = POINTS_CONFIG.MILESTONES[30];
             milestonePointsTotal += points;
 
-            await supabaseAdmin.from('points_log').insert({
+            await supabase.from('points_log').insert({
               wallet_address: user.wallet_address,
               amount: points,
               source: POINT_SOURCES.MILESTONE_30D,
@@ -144,7 +148,7 @@ export async function GET(request: NextRequest) {
               metadata: { token_id: holding.token_id, days_held: daysHeld },
             });
 
-            await supabaseAdmin
+            await supabase
               .from('holdings')
               .update({ milestone_30d_awarded: true })
               .eq('id', holding.id);
@@ -157,7 +161,7 @@ export async function GET(request: NextRequest) {
             const points = POINTS_CONFIG.MILESTONES[90];
             milestonePointsTotal += points;
 
-            await supabaseAdmin.from('points_log').insert({
+            await supabase.from('points_log').insert({
               wallet_address: user.wallet_address,
               amount: points,
               source: POINT_SOURCES.MILESTONE_90D,
@@ -165,7 +169,7 @@ export async function GET(request: NextRequest) {
               metadata: { token_id: holding.token_id, days_held: daysHeld },
             });
 
-            await supabaseAdmin
+            await supabase
               .from('holdings')
               .update({ milestone_90d_awarded: true })
               .eq('id', holding.id);
@@ -178,7 +182,7 @@ export async function GET(request: NextRequest) {
             const points = POINTS_CONFIG.MILESTONES[365];
             milestonePointsTotal += points;
 
-            await supabaseAdmin.from('points_log').insert({
+            await supabase.from('points_log').insert({
               wallet_address: user.wallet_address,
               amount: points,
               source: POINT_SOURCES.MILESTONE_365D,
@@ -186,7 +190,7 @@ export async function GET(request: NextRequest) {
               metadata: { token_id: holding.token_id, days_held: daysHeld },
             });
 
-            await supabaseAdmin
+            await supabase
               .from('holdings')
               .update({ milestone_365d_awarded: true })
               .eq('id', holding.id);
@@ -198,7 +202,7 @@ export async function GET(request: NextRequest) {
         // Update user's total points
         const totalPointsToAdd = dailyPointsTotal + milestonePointsTotal;
         if (totalPointsToAdd > 0) {
-          await supabaseAdmin
+          await supabase
             .from('users')
             .update({ 
               total_points: user.total_points + totalPointsToAdd,

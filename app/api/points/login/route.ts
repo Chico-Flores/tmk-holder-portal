@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { POINTS_CONFIG, POINT_SOURCES } from '@/lib/points';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '@/lib/constants';
@@ -16,9 +16,10 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedAddress = walletAddress.toLowerCase();
+    const supabase = getSupabaseAdmin();
 
     // Check if user exists
-    const { data: existingUser } = await supabaseAdmin
+    const { data: existingUser } = await supabase
       .from('users')
       .select('*')
       .eq('wallet_address', normalizedAddress)
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       // Update last_seen_at
-      await supabaseAdmin
+      await supabase
         .from('users')
         .update({ last_seen_at: now })
         .eq('wallet_address', normalizedAddress);
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new user
-    const { data: newUser, error: createError } = await supabaseAdmin
+    const { data: newUser, error: createError } = await supabase
       .from('users')
       .insert({
         wallet_address: normalizedAddress,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the first verification bonus
-    await supabaseAdmin.from('points_log').insert({
+    await supabase.from('points_log').insert({
       wallet_address: normalizedAddress,
       amount: POINTS_CONFIG.FIRST_VERIFICATION_BONUS,
       source: POINT_SOURCES.FIRST_VERIFICATION,
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
  */
 async function syncHoldings(walletAddress: string) {
   try {
+    const supabase = getSupabaseAdmin();
     const provider = new ethers.JsonRpcProvider(RPC_URL);
     const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
@@ -105,7 +107,7 @@ async function syncHoldings(walletAddress: string) {
     const now = new Date().toISOString();
 
     // Get existing holdings
-    const { data: existingHoldings } = await supabaseAdmin
+    const { data: existingHoldings } = await supabase
       .from('holdings')
       .select('*')
       .eq('wallet_address', walletAddress);
@@ -115,7 +117,7 @@ async function syncHoldings(walletAddress: string) {
     // Mark sold NFTs as not current
     const soldTokenIds = existingTokenIds.filter(id => !currentTokenIds.includes(id));
     if (soldTokenIds.length > 0) {
-      await supabaseAdmin
+      await supabase
         .from('holdings')
         .update({ is_current: false, last_seen_at: now })
         .eq('wallet_address', walletAddress)
@@ -128,13 +130,13 @@ async function syncHoldings(walletAddress: string) {
 
       if (existing) {
         // Update last_seen and mark as current
-        await supabaseAdmin
+        await supabase
           .from('holdings')
           .update({ is_current: true, last_seen_at: now })
           .eq('id', existing.id);
       } else {
         // Insert new holding
-        await supabaseAdmin.from('holdings').insert({
+        await supabase.from('holdings').insert({
           wallet_address: walletAddress,
           token_id: tokenId,
           first_seen_at: now,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 // Mark this route as dynamic since it uses searchParams
 export const dynamic = 'force-dynamic';
@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const walletAddress = searchParams.get('wallet')?.toLowerCase();
+    const supabase = getSupabaseAdmin();
 
     // Get top users
-    const { data: topUsers, error } = await supabaseAdmin
+    const { data: topUsers, error } = await supabase
       .from('users')
       .select('wallet_address, total_points, created_at')
       .order('total_points', { ascending: false })
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Get NFT counts for each user
     const usersWithNftCounts = await Promise.all(
       (topUsers || []).map(async (user, index) => {
-        const { count } = await supabaseAdmin
+        const { count } = await supabase
           .from('holdings')
           .select('*', { count: 'exact', head: true })
           .eq('wallet_address', user.wallet_address)
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Get total user count
-    const { count: totalUsers } = await supabaseAdmin
+    const { count: totalUsers } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
 
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
 
       if (!userInList) {
         // User not in current page, fetch their data
-        const { data: user } = await supabaseAdmin
+        const { data: user } = await supabase
           .from('users')
           .select('wallet_address, total_points, created_at')
           .eq('wallet_address', walletAddress)
@@ -65,13 +66,13 @@ export async function GET(request: NextRequest) {
 
         if (user) {
           // Get their rank
-          const { count: higherRankedCount } = await supabaseAdmin
+          const { count: higherRankedCount } = await supabase
             .from('users')
             .select('*', { count: 'exact', head: true })
             .gt('total_points', user.total_points);
 
           // Get their NFT count
-          const { count: nftCount } = await supabaseAdmin
+          const { count: nftCount } = await supabase
             .from('holdings')
             .select('*', { count: 'exact', head: true })
             .eq('wallet_address', walletAddress)
