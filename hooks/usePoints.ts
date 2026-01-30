@@ -27,6 +27,7 @@ interface UsePointsReturn {
   pointsHistory: PointsLog[];
   stats: UserStats | null;
   isLoading: boolean;
+  hasFetched: boolean;
   error: string | null;
   refetch: () => Promise<void>;
   login: () => Promise<{ isNewUser: boolean; bonusAwarded: number } | null>;
@@ -38,8 +39,9 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
   const [holdings, setHoldings] = useState<HoldingWithStats[]>([]);
   const [pointsHistory, setPointsHistory] = useState<PointsLog[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start as true to prevent premature registration
   const [error, setError] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false); // Track if we've done initial fetch
 
   const fetchUserData = useCallback(async () => {
     if (!walletAddress) {
@@ -47,6 +49,8 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
       setHoldings([]);
       setPointsHistory([]);
       setStats(null);
+      setIsLoading(false);
+      setHasFetched(true);
       return;
     }
 
@@ -78,6 +82,7 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setIsLoading(false);
+      setHasFetched(true);
     }
   }, [walletAddress]);
 
@@ -150,6 +155,7 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
     pointsHistory,
     stats,
     isLoading,
+    hasFetched,
     error,
     refetch: fetchUserData,
     login,

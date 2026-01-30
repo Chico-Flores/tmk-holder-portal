@@ -10,7 +10,7 @@ interface PointsDashboardProps {
 }
 
 export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps) {
-  const { user, holdings, pointsHistory, stats, isLoading, error, login, refetch, updateUsername } = usePoints(walletAddress);
+  const { user, holdings, pointsHistory, stats, isLoading, hasFetched, error, login, refetch, updateUsername } = usePoints(walletAddress);
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeBonus, setWelcomeBonus] = useState(0);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -20,10 +20,11 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
 
-  // Auto-login when user doesn't exist
+  // Auto-login only when we've fetched and confirmed user doesn't exist
   useEffect(() => {
     async function registerUser() {
-      if (!isLoading && !user && walletAddress && !isRegistering) {
+      // Only register if: we've fetched data, user doesn't exist, not already registering
+      if (hasFetched && !isLoading && !user && walletAddress && !isRegistering) {
         setIsRegistering(true);
         const result = await login();
         if (result?.isNewUser && result.bonusAwarded > 0) {
@@ -35,7 +36,7 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
       }
     }
     registerUser();
-  }, [isLoading, user, walletAddress, login, isRegistering]);
+  }, [hasFetched, isLoading, user, walletAddress, login, isRegistering]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -64,19 +65,28 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
     setIsEditingUsername(true);
   };
 
+  // Show loading only for initial load or registration
   if (isLoading || isRegistering) {
+    // Determine what message to show
+    let title = 'Loading your points...';
+    let subtitle = 'Please wait';
+    
+    if (isRegistering) {
+      title = 'Registering your wallet...';
+      subtitle = 'Syncing your NFT holdings';
+    } else if (!hasFetched) {
+      title = 'Loading your points...';
+      subtitle = 'Fetching your data';
+    }
+    
     return (
       <div className="space-y-6">
         <div className="bg-tmk-gray-900 rounded-2xl p-8 border border-tmk-gray-800 text-center">
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-tmk-red border-t-transparent rounded-full animate-spin"></div>
             <div>
-              <p className="text-white font-medium">
-                {isRegistering ? 'Registering your wallet...' : 'Loading your points...'}
-              </p>
-              <p className="text-tmk-gray-400 text-sm mt-1">
-                {isRegistering ? 'Syncing your NFT holdings' : 'Please wait'}
-              </p>
+              <p className="text-white font-medium">{title}</p>
+              <p className="text-tmk-gray-400 text-sm mt-1">{subtitle}</p>
             </div>
           </div>
         </div>
