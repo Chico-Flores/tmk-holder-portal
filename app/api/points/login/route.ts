@@ -4,6 +4,8 @@ import { POINTS_CONFIG, POINT_SOURCES } from '@/lib/points';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '@/lib/constants';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { walletAddress } = await request.json();

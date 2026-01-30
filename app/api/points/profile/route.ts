@@ -3,6 +3,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL } from '@/lib/constants';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { walletAddress, profile_nft_id, twitter_handle } = await request.json();

@@ -64,7 +64,9 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
     setError(null);
 
     try {
-      const response = await fetch(`/api/points/user/${walletAddress}`);
+      const response = await fetch(`/api/points/user/${walletAddress}`, {
+        cache: 'no-store',
+      });
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -238,7 +240,9 @@ export function useLeaderboard(walletAddress: string | null): UseLeaderboardRetu
         params.set('wallet', walletAddress);
       }
 
-      const response = await fetch(`/api/points/leaderboard?${params}`);
+      const response = await fetch(`/api/points/leaderboard?${params}`, {
+        cache: 'no-store',
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch leaderboard');

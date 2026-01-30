@@ -48,7 +48,9 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
     setError(null);
 
     try {
-      const response = await fetch(`/api/points/user-profile/${walletAddress}`);
+      const response = await fetch(`/api/points/user-profile/${walletAddress}`, {
+        cache: 'no-store',
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch user profile');
