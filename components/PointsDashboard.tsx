@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { usePoints } from '@/hooks/usePoints';
 import { formatPoints, getDailyRateDescription, POINTS_CONFIG } from '@/lib/points';
+import { ProfileSettings } from './ProfileSettings';
+
+// R2 public URL for images
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
 interface PointsDashboardProps {
   walletAddress: string;
@@ -10,7 +14,7 @@ interface PointsDashboardProps {
 }
 
 export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps) {
-  const { user, holdings, pointsHistory, stats, isLoading, hasFetched, error, login, refetch, updateUsername } = usePoints(walletAddress);
+  const { user, holdings, pointsHistory, stats, isLoading, hasFetched, error, login, refetch, updateUsername, updateProfile } = usePoints(walletAddress);
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomeBonus, setWelcomeBonus] = useState(0);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -19,6 +23,7 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
 
   // Auto-login only when we've fetched and confirmed user doesn't exist
   useEffect(() => {
@@ -64,6 +69,15 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
     setUsernameError(null);
     setIsEditingUsername(true);
   };
+
+  const handleSaveProfile = async (profileNftId: number | null, twitterHandle: string | null) => {
+    return await updateProfile({ profile_nft_id: profileNftId, twitter_handle: twitterHandle });
+  };
+
+  // Get profile picture URL
+  const profilePicUrl = user?.profile_nft_id && R2_PUBLIC_URL
+    ? `${R2_PUBLIC_URL}/images/${user.profile_nft_id}.png`
+    : null;
 
   // Show loading only for initial load or registration
   if (isLoading || isRegistering) {
@@ -154,59 +168,102 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
           </svg>
         </button>
         
-        {/* Username Display/Editor */}
-        {!isEditingUsername ? (
-          <div className="flex items-center justify-center gap-2 mb-4">
-            {user?.username ? (
-              <span className="text-xl font-semibold text-white">{user.username}</span>
-            ) : (
-              <span className="text-tmk-gray-500 italic">No username set</span>
-            )}
-            <button
-              onClick={startEditingUsername}
-              className="p-1 text-tmk-gray-400 hover:text-white transition-colors"
-              title="Edit username"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
-          </div>
-        ) : (
-          <div className="mb-4">
-            <div className="flex items-center justify-center gap-2 max-w-xs mx-auto">
-              <input
-                type="text"
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Enter username"
-                maxLength={20}
-                className="flex-1 px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
-                           text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
+        {/* Profile Section */}
+        <div className="flex flex-col items-center gap-3 mb-6">
+          {/* Profile Picture */}
+          <div className="relative">
+            {profilePicUrl ? (
+              <img
+                src={profilePicUrl}
+                alt="Profile"
+                className="w-20 h-20 rounded-full object-cover border-2 border-tmk-gray-700"
               />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-tmk-gray-800 border-2 border-tmk-gray-700 flex items-center justify-center">
+                <svg className="w-10 h-10 text-tmk-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              </div>
+            )}
+          </div>
+
+          {/* Username and Twitter */}
+          {!isEditingUsername ? (
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-2">
+                {user?.username ? (
+                  <span className="text-xl font-semibold text-white">{user.username}</span>
+                ) : (
+                  <span className="text-tmk-gray-500 italic">No username set</span>
+                )}
+                <button
+                  onClick={startEditingUsername}
+                  className="p-1 text-tmk-gray-400 hover:text-white transition-colors"
+                  title="Edit username"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </div>
+              {user?.twitter_handle && (
+                <a
+                  href={`https://x.com/${user.twitter_handle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-tmk-gray-400 hover:text-white transition-colors text-sm"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  <span>@{user.twitter_handle}</span>
+                </a>
+              )}
+              {/* Profile Settings Button */}
               <button
-                onClick={handleSaveUsername}
-                disabled={isSavingUsername}
-                className="px-3 py-2 bg-tmk-red hover:bg-tmk-red-hover text-white rounded-lg
-                           disabled:opacity-50 transition-colors"
+                onClick={() => setShowProfileSettings(true)}
+                className="mt-2 px-3 py-1.5 text-sm text-tmk-gray-400 hover:text-white 
+                           border border-tmk-gray-700 hover:border-tmk-gray-600 rounded-lg transition-colors"
               >
-                {isSavingUsername ? '...' : 'Save'}
-              </button>
-              <button
-                onClick={() => setIsEditingUsername(false)}
-                className="px-3 py-2 bg-tmk-gray-700 hover:bg-tmk-gray-600 text-white rounded-lg
-                           transition-colors"
-              >
-                Cancel
+                Edit Profile
               </button>
             </div>
-            {usernameError && (
-              <p className="text-red-400 text-sm mt-2">{usernameError}</p>
-            )}
-            <p className="text-tmk-gray-500 text-xs mt-2">3-20 characters, letters, numbers, _ and - only</p>
-          </div>
-        )}
+          ) : (
+            <div className="w-full max-w-xs">
+              <div className="flex items-center justify-center gap-2">
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="Enter username"
+                  maxLength={20}
+                  className="flex-1 px-3 py-2 bg-tmk-gray-800 border border-tmk-gray-700 rounded-lg
+                             text-white placeholder-tmk-gray-500 focus:outline-none focus:border-tmk-red"
+                />
+                <button
+                  onClick={handleSaveUsername}
+                  disabled={isSavingUsername}
+                  className="px-3 py-2 bg-tmk-red hover:bg-tmk-red-hover text-white rounded-lg
+                             disabled:opacity-50 transition-colors"
+                >
+                  {isSavingUsername ? '...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setIsEditingUsername(false)}
+                  className="px-3 py-2 bg-tmk-gray-700 hover:bg-tmk-gray-600 text-white rounded-lg
+                             transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+              {usernameError && (
+                <p className="text-red-400 text-sm mt-2 text-center">{usernameError}</p>
+              )}
+              <p className="text-tmk-gray-500 text-xs mt-2 text-center">3-20 characters, letters, numbers, _ and - only</p>
+            </div>
+          )}
+        </div>
         
         <h2 className="text-tmk-gray-400 text-lg mb-2">YOUR POINTS</h2>
         <div className="text-5xl sm:text-6xl font-bold text-white mb-4 font-heading">
@@ -337,6 +394,16 @@ export function PointsDashboard({ walletAddress, onLogin }: PointsDashboardProps
           </li>
         </ul>
       </div>
+
+      {/* Profile Settings Modal */}
+      <ProfileSettings
+        isOpen={showProfileSettings}
+        onClose={() => setShowProfileSettings(false)}
+        holdings={holdings}
+        currentProfileNftId={user?.profile_nft_id || null}
+        currentTwitterHandle={user?.twitter_handle || null}
+        onSave={handleSaveProfile}
+      />
     </div>
   );
 }

@@ -3,6 +3,9 @@
 import { useLeaderboard } from '@/hooks/usePoints';
 import { formatPoints, formatWalletAddress } from '@/lib/points';
 
+// R2 public URL for images
+const R2_PUBLIC_URL = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+
 interface LeaderboardProps {
   walletAddress: string | null;
 }
@@ -67,9 +70,23 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
       {currentUser && currentUser.rank > 50 && (
         <div className="bg-tmk-red/20 border border-tmk-red/50 rounded-xl p-4 mb-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <span className="text-tmk-red font-bold">#{currentUser.rank}</span>
-              <span className="text-white">You</span>
+              {/* Profile Picture */}
+              {currentUser.profile_nft_id && R2_PUBLIC_URL ? (
+                <img
+                  src={`${R2_PUBLIC_URL}/images/${currentUser.profile_nft_id}.png`}
+                  alt=""
+                  className="w-8 h-8 rounded-full object-cover border border-tmk-red/50"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-tmk-gray-800 border border-tmk-red/50 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-tmk-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                </div>
+              )}
+              <span className="text-white">{currentUser.username || 'You'}</span>
               <span className="text-tmk-gray-400 text-sm">{currentUser.nftCount} NFTs</span>
             </div>
             <span className="text-white font-bold">{formatPoints(currentUser.total_points)} pts</span>
@@ -97,36 +114,78 @@ export function Leaderboard({ walletAddress }: LeaderboardProps) {
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 text-center">
+                <div className="flex items-center gap-3">
+                  {/* Rank */}
+                  <div className="w-10 text-center flex-shrink-0">
                     {rankIcon ? (
                       <span className="text-2xl">{rankIcon}</span>
                     ) : (
                       <span className="text-tmk-gray-400 font-mono">#{user.rank}</span>
                     )}
                   </div>
-                  <div>
+                  
+                  {/* Profile Picture */}
+                  <div className="flex-shrink-0">
+                    {user.profile_nft_id && R2_PUBLIC_URL ? (
+                      <img
+                        src={`${R2_PUBLIC_URL}/images/${user.profile_nft_id}.png`}
+                        alt=""
+                        className="w-10 h-10 rounded-full object-cover border border-tmk-gray-700"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-tmk-gray-800 border border-tmk-gray-700 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-tmk-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Name and Info */}
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className={`font-medium ${isCurrentUser ? 'text-tmk-red' : 'text-white'}`}>
+                      <span className={`font-medium truncate ${isCurrentUser ? 'text-tmk-red' : 'text-white'}`}>
                         {isCurrentUser 
                           ? (user.username || 'You')
                           : (user.username || formatWalletAddress(user.wallet_address))
                         }
                       </span>
                       {isCurrentUser && (
-                        <span className="text-xs bg-tmk-red/20 text-tmk-red px-2 py-0.5 rounded">
+                        <span className="text-xs bg-tmk-red/20 text-tmk-red px-2 py-0.5 rounded flex-shrink-0">
                           YOU
                         </span>
                       )}
                     </div>
-                    <span className="text-tmk-gray-500 text-sm">
-                      {user.nftCount} NFTs {!user.username && `• ${formatWalletAddress(user.wallet_address)}`}
-                    </span>
+                    <div className="flex items-center gap-2 text-tmk-gray-500 text-sm">
+                      <span>{user.nftCount} NFTs</span>
+                      {!user.username && <span>• {formatWalletAddress(user.wallet_address)}</span>}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-white font-bold">{formatPoints(user.total_points)}</div>
-                  <div className="text-tmk-gray-500 text-sm">points</div>
+                
+                {/* Points and Twitter */}
+                <div className="flex items-center gap-3">
+                  {/* Twitter Link */}
+                  {user.twitter_handle && (
+                    <a
+                      href={`https://x.com/${user.twitter_handle}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-tmk-gray-400 hover:text-white hover:bg-tmk-gray-800 rounded-lg transition-colors"
+                      title={`@${user.twitter_handle}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                    </a>
+                  )}
+                  
+                  {/* Points */}
+                  <div className="text-right">
+                    <div className="text-white font-bold">{formatPoints(user.total_points)}</div>
+                    <div className="text-tmk-gray-500 text-sm">points</div>
+                  </div>
                 </div>
               </div>
             </div>

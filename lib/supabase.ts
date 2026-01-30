@@ -46,6 +46,8 @@ export interface User {
   last_seen_at: string | null;
   created_at: string;
   username: string | null;
+  profile_nft_id: number | null;
+  twitter_handle: string | null;
 }
 
 export interface Holding {

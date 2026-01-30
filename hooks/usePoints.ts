@@ -21,6 +21,11 @@ interface UserStats {
   totalUsers: number;
 }
 
+interface ProfileUpdate {
+  profile_nft_id?: number | null;
+  twitter_handle?: string | null;
+}
+
 interface UsePointsReturn {
   user: UserWithRank | null;
   holdings: HoldingWithStats[];
@@ -32,6 +37,7 @@ interface UsePointsReturn {
   refetch: () => Promise<void>;
   login: () => Promise<{ isNewUser: boolean; bonusAwarded: number } | null>;
   updateUsername: (username: string) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (profile: ProfileUpdate) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function usePoints(walletAddress: string | null): UsePointsReturn {
@@ -144,6 +150,34 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
     }
   }, [walletAddress]);
 
+  const updateProfile = useCallback(async (profile: ProfileUpdate): Promise<{ success: boolean; error?: string }> => {
+    if (!walletAddress) return { success: false, error: 'No wallet connected' };
+
+    try {
+      const response = await fetch('/api/points/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress, ...profile }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.error || 'Failed to update profile' };
+      }
+
+      // Update local state
+      if (data.user) {
+        setUser(prev => prev ? { ...prev, ...data.user } : null);
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Update profile error:', err);
+      return { success: false, error: 'Failed to update profile' };
+    }
+  }, [walletAddress]);
+
   // Auto-fetch when wallet changes
   useEffect(() => {
     fetchUserData();
@@ -160,6 +194,7 @@ export function usePoints(walletAddress: string | null): UsePointsReturn {
     refetch: fetchUserData,
     login,
     updateUsername,
+    updateProfile,
   };
 }
 
@@ -171,6 +206,8 @@ interface LeaderboardUser {
   rank: number;
   nftCount: number;
   username: string | null;
+  profile_nft_id: number | null;
+  twitter_handle: string | null;
 }
 
 interface UseLeaderboardReturn {

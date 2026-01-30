@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         .from('users')
         .update({ last_seen_at: now })
         .eq('wallet_address', normalizedAddress)
-        .select('wallet_address, total_points, first_verified_at, last_seen_at, created_at, username')
+        .select('wallet_address, total_points, first_verified_at, last_seen_at, created_at, username, profile_nft_id, twitter_handle')
         .single();
 
       // Sync holdings
