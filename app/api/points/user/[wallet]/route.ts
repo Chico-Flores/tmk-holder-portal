@@ -10,10 +10,10 @@ export async function GET(
     const walletAddress = params.wallet.toLowerCase();
     const supabase = getSupabaseAdmin();
 
-    // Get user data
+    // Get user data (explicitly list fields to ensure username is included)
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('*')
+      .select('wallet_address, total_points, first_verified_at, last_seen_at, created_at, username')
       .eq('wallet_address', walletAddress)
       .single();
 

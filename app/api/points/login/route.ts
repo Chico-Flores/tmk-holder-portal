@@ -28,17 +28,19 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     if (existingUser) {
-      // Update last_seen_at
-      await supabase
+      // Update last_seen_at and get fresh user data
+      const { data: updatedUser } = await supabase
         .from('users')
         .update({ last_seen_at: now })
-        .eq('wallet_address', normalizedAddress);
+        .eq('wallet_address', normalizedAddress)
+        .select('wallet_address, total_points, first_verified_at, last_seen_at, created_at, username')
+        .single();
 
       // Sync holdings
       await syncHoldings(normalizedAddress);
 
       return NextResponse.json({
-        user: existingUser,
+        user: updatedUser || existingUser,
         isNewUser: false,
         bonusAwarded: 0,
       });
