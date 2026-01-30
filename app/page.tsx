@@ -10,9 +10,15 @@ import { EmptyState } from '@/components/EmptyState';
 import { StatsBar } from '@/components/StatsBar';
 import { NFTGrid } from '@/components/NFTGrid';
 import { Footer } from '@/components/Footer';
+import { PortalTabs } from '@/components/PortalTabs';
+import { PointsDashboard } from '@/components/PointsDashboard';
+import { Leaderboard } from '@/components/Leaderboard';
+
+type TabType = 'nfts' | 'points' | 'leaderboard';
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('nfts');
 
   useEffect(() => {
     setIsMounted(true);
@@ -105,13 +111,34 @@ export default function Home() {
         {/* Connected and Correct Network */}
         {isConnected && isCorrectNetwork && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {isLoading && <LoadingState />}
-            {!isLoading && nfts.length === 0 && <EmptyState />}
-            {!isLoading && nfts.length > 0 && (
+            {/* Tab Navigation */}
+            <PortalTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+            {/* NFTs Tab */}
+            {activeTab === 'nfts' && (
               <>
-                <StatsBar nftCount={nfts.length} />
-                <NFTGrid nfts={nfts} walletAddress={address!} />
+                {isLoading && <LoadingState />}
+                {!isLoading && nfts.length === 0 && <EmptyState />}
+                {!isLoading && nfts.length > 0 && (
+                  <>
+                    <StatsBar nftCount={nfts.length} />
+                    <NFTGrid nfts={nfts} walletAddress={address!} />
+                  </>
+                )}
               </>
+            )}
+
+            {/* Points Tab */}
+            {activeTab === 'points' && (
+              <PointsDashboard 
+                walletAddress={address!} 
+                onLogin={async () => {}} 
+              />
+            )}
+
+            {/* Leaderboard Tab */}
+            {activeTab === 'leaderboard' && (
+              <Leaderboard walletAddress={address} />
             )}
           </div>
         )}
