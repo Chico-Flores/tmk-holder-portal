@@ -3,7 +3,8 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
+// POST to avoid Vercel edge caching
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ wallet: string }> }
 ) {

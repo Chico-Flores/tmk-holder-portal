@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
-// Mark this route as dynamic since it uses searchParams
+// Mark this route as dynamic - uses POST to avoid Vercel edge caching
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
-    const walletAddress = searchParams.get('wallet')?.toLowerCase();
+    // Parse parameters from request body (POST to avoid caching)
+    const body = await request.json().catch(() => ({}));
+    const limit = parseInt(body.limit || '50');
+    const offset = parseInt(body.offset || '0');
+    const walletAddress = body.wallet?.toLowerCase();
     const supabase = getSupabaseAdmin();
 
     // Get top users

@@ -234,12 +234,14 @@ export function useLeaderboard(walletAddress: string | null): UseLeaderboardRetu
     setError(null);
 
     try {
-      const params = new URLSearchParams({ limit: '50' });
-      if (walletAddress) {
-        params.set('wallet', walletAddress);
-      }
-
-      const response = await fetch(`/api/points/leaderboard?${params}`, {
+      // Use POST to avoid Vercel edge caching
+      const response = await fetch('/api/points/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          limit: 50,
+          wallet: walletAddress || undefined,
+        }),
         cache: 'no-store',
       });
       

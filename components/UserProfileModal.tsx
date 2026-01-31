@@ -48,7 +48,11 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
     setError(null);
 
     try {
+      // Use POST to avoid Vercel edge caching
       const response = await fetch(`/api/points/user-profile/${walletAddress}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
         cache: 'no-store',
       });
       
