@@ -100,12 +100,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       leaderboard: usersWithNftCounts,
       totalUsers: totalUsers || 0,
       currentUser: currentUserData,
       pointsToNextRank,
     });
+    
+    // Prevent any caching at CDN/edge level
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Leaderboard error:', error);
     return NextResponse.json(

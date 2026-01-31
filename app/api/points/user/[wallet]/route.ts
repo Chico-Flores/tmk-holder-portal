@@ -73,7 +73,7 @@ export async function GET(
       };
     }) || [];
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         ...user,
         rank,
@@ -88,6 +88,13 @@ export async function GET(
         totalUsers: totalUsers || 0,
       },
     });
+    
+    // Prevent any caching at CDN/edge level
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
   } catch (error) {
     console.error('Error fetching user data:', error);
     return NextResponse.json(
