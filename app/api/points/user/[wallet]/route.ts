@@ -89,7 +89,10 @@ export async function GET(
       },
       _debug: {
         serverTime: new Date().toISOString(),
-        version: 'v2-no-cache',
+        version: 'v3-check-url',
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        userError: userError?.message || null,
+        rawUserData: user,
       },
     });
     
