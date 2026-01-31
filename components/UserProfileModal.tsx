@@ -34,6 +34,7 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
   const [totalHoldings, setTotalHoldings] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enlargedNft, setEnlargedNft] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen && walletAddress) {
@@ -176,38 +177,50 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
               </div>
             </div>
 
-            {/* NFT Holdings */}
+            {/* NFT Holdings - Scrollable */}
             {holdings.length > 0 && (
               <div className="p-4">
-                <h3 className="text-sm font-medium text-tmk-gray-400 mb-3">TMK NFTs Owned</h3>
-                <div className="grid grid-cols-4 gap-2">
-                  {holdings.map((holding) => {
-                    const imageUrl = R2_PUBLIC_URL 
-                      ? `${R2_PUBLIC_URL}/images/${holding.token_id}.png`
-                      : '';
+                <h3 className="text-sm font-medium text-tmk-gray-400 mb-3">
+                  TMK NFTs Owned ({totalHoldings})
+                </h3>
+                <div className="max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                  <div className="grid grid-cols-4 gap-2">
+                    {holdings.map((holding) => {
+                      const imageUrl = R2_PUBLIC_URL 
+                        ? `${R2_PUBLIC_URL}/images/${holding.token_id}.png`
+                        : '';
 
-                    return (
-                      <div
-                        key={holding.token_id}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-tmk-gray-700"
-                      >
-                        <img
-                          src={imageUrl}
-                          alt={`TMK #${holding.token_id}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs py-0.5 text-center">
-                          #{holding.token_id}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={holding.token_id}
+                          onClick={() => setEnlargedNft(holding.token_id)}
+                          className="relative aspect-square rounded-lg overflow-hidden border border-tmk-gray-700 
+                                     hover:border-tmk-red transition-colors cursor-pointer group"
+                        >
+                          <img
+                            src={imageUrl}
+                            alt={`TMK #${holding.token_id}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs py-0.5 text-center">
+                            #{holding.token_id}
+                          </div>
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-tmk-red/0 group-hover:bg-tmk-red/20 transition-colors flex items-center justify-center">
+                            <svg 
+                              className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                            </svg>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                {totalHoldings > 12 && (
-                  <p className="text-tmk-gray-500 text-sm text-center mt-3">
-                    +{totalHoldings - 12} more NFTs
-                  </p>
-                )}
               </div>
             )}
 
@@ -223,6 +236,45 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
           </>
         ) : null}
       </div>
+
+      {/* Enlarged NFT Viewer (Lightbox) */}
+      {enlargedNft && R2_PUBLIC_URL && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          onClick={() => setEnlargedNft(null)}
+        >
+          {/* Dark backdrop */}
+          <div className="absolute inset-0 bg-black/90" />
+          
+          {/* Image container */}
+          <div 
+            className="relative max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setEnlargedNft(null)}
+              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* NFT Image */}
+            <div className="bg-tmk-gray-900 rounded-2xl overflow-hidden border border-tmk-gray-700 shadow-2xl">
+              <img
+                src={`${R2_PUBLIC_URL}/images/${enlargedNft}.png`}
+                alt={`TMK #${enlargedNft}`}
+                className="w-full h-auto"
+              />
+              <div className="p-4 text-center border-t border-tmk-gray-800">
+                <h3 className="text-xl font-bold text-white">TMK #{enlargedNft}</h3>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

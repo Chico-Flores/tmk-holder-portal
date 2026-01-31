@@ -40,14 +40,13 @@ export async function POST(
       .from('users')
       .select('*', { count: 'exact', head: true });
 
-    // Get user's current NFT holdings (limited to first 12 for display)
+    // Get all user's current NFT holdings (no limit - modal will scroll)
     const { data: holdings } = await supabase
       .from('holdings')
       .select('token_id, first_seen_at')
       .eq('wallet_address', walletAddress)
       .eq('is_current', true)
-      .order('token_id', { ascending: true })
-      .limit(12);
+      .order('token_id', { ascending: true });
 
     // Get total holdings count
     const { count: totalHoldings } = await supabase

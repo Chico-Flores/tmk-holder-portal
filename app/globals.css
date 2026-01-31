@@ -115,3 +115,21 @@ a:focus-visible {
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+/* Custom scrollbar for modals - thinner */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--tmk-gray-700);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--tmk-gray-400);
+}
