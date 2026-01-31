@@ -13,11 +13,14 @@ export async function GET(
     const walletAddress = wallet.toLowerCase();
     const supabase = getSupabaseAdmin();
 
-    // Get user data (explicitly list fields to ensure all profile fields are included)
+    // Use an update query that returns data to force fresh read (bypasses any Supabase caching)
+    // This is a workaround for stale SELECT queries
+    const now = new Date().toISOString();
     const { data: user, error: userError } = await supabase
       .from('users')
-      .select('wallet_address, total_points, first_verified_at, last_seen_at, created_at, username, profile_nft_id, twitter_handle')
+      .update({ last_seen_at: now })
       .eq('wallet_address', walletAddress)
+      .select('wallet_address, total_points, first_verified_at, last_seen_at, created_at, username, profile_nft_id, twitter_handle')
       .single();
 
     if (userError || !user) {
@@ -89,7 +92,7 @@ export async function GET(
       },
       _debug: {
         serverTime: new Date().toISOString(),
-        version: 'v3-check-url',
+        version: 'v4-update-to-read',
         supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
         userError: userError?.message || null,
         rawUserData: user,
