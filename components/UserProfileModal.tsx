@@ -28,6 +28,25 @@ interface UserProfileModalProps {
   walletAddress: string | null;
 }
 
+// NFT rank tier colors (same as NFTDetailModal)
+const getRankTier = (rank: number) => {
+  if (rank <= 50) return 'legendary';
+  if (rank <= 150) return 'epic';
+  if (rank <= 375) return 'rare';
+  if (rank <= 750) return 'uncommon';
+  if (rank <= 1200) return 'common';
+  return 'basic';
+};
+
+const rankColors: Record<string, string> = {
+  legendary: 'from-yellow-400 to-amber-500 text-black',
+  epic: 'from-purple-500 to-pink-500 text-white',
+  rare: 'from-blue-500 to-cyan-500 text-white',
+  uncommon: 'from-emerald-500 to-green-600 text-white',
+  common: 'from-teal-600 to-cyan-700 text-white',
+  basic: 'from-slate-400 to-slate-500 text-white',
+};
+
 export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfileModalProps) {
   const [user, setUser] = useState<UserProfileData | null>(null);
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -35,12 +54,32 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enlargedNft, setEnlargedNft] = useState<number | null>(null);
+  const [nftRank, setNftRank] = useState<number | null>(null);
+  const [nftRankLoading, setNftRankLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && walletAddress) {
       fetchUserProfile();
     }
   }, [isOpen, walletAddress]);
+
+  // Fetch NFT rank when an NFT is enlarged
+  useEffect(() => {
+    if (enlargedNft) {
+      setNftRankLoading(true);
+      setNftRank(null);
+      
+      fetch(`/api/metadata/${enlargedNft}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.rank) {
+            setNftRank(data.rank);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setNftRankLoading(false));
+    }
+  }, [enlargedNft]);
 
   const fetchUserProfile = async () => {
     if (!walletAddress) return;
@@ -268,8 +307,61 @@ export function UserProfileModal({ isOpen, onClose, walletAddress }: UserProfile
                 alt={`TMK #${enlargedNft}`}
                 className="w-full h-auto"
               />
-              <div className="p-4 text-center border-t border-tmk-gray-800">
-                <h3 className="text-xl font-bold text-white">TMK #{enlargedNft}</h3>
+              
+              {/* Footer with Rank, Title, and Message */}
+              <div className="p-4 border-t border-tmk-gray-800">
+                <div className="flex items-center justify-between">
+                  {/* Left: Rank Badge */}
+                  <div className="flex-1">
+                    {nftRankLoading ? (
+                      <div className="w-20 h-8 bg-tmk-gray-800 rounded-lg animate-pulse" />
+                    ) : nftRank ? (
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r ${rankColors[getRankTier(nftRank)]} text-sm font-bold shadow-lg`}>
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        <span>#{nftRank}</span>
+                      </div>
+                    ) : (
+                      <div className="w-20" /> // Placeholder for alignment
+                    )}
+                  </div>
+                  
+                  {/* Center: NFT Title */}
+                  <div className="flex-1 text-center">
+                    <h3 className="text-xl font-bold text-white">TMK #{enlargedNft}</h3>
+                  </div>
+                  
+                  {/* Right: Message Icon */}
+                  <div className="flex-1 flex justify-end">
+                    {user?.twitter_handle ? (
+                      <a
+                        href={`https://x.com/messages/compose?recipient_screen_name=${user.twitter_handle}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 bg-tmk-gray-800 hover:bg-tmk-red rounded-lg transition-colors group"
+                        title={`Message @${user.twitter_handle}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg 
+                          className="w-5 h-5 text-tmk-gray-400 group-hover:text-white transition-colors" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2} 
+                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" 
+                          />
+                        </svg>
+                      </a>
+                    ) : (
+                      <div className="w-10" /> // Placeholder for alignment
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
