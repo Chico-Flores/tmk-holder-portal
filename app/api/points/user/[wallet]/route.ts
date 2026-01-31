@@ -4,7 +4,8 @@ import { calculateDailyPoints, calculateDaysHeld, getNextMilestone } from '@/lib
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
+// POST to avoid Vercel edge caching for all queries
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ wallet: string }> }
 ) {
