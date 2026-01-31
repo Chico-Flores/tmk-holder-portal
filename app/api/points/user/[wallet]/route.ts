@@ -94,8 +94,6 @@ export async function GET(
         serverTime: new Date().toISOString(),
         version: 'v4-update-to-read',
         supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        userError: userError?.message || null,
-        rawUserData: user,
       },
     });
     
