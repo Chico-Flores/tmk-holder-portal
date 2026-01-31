@@ -87,6 +87,10 @@ export async function GET(
         rank,
         totalUsers: totalUsers || 0,
       },
+      _debug: {
+        serverTime: new Date().toISOString(),
+        version: 'v2-no-cache',
+      },
     });
     
     // Prevent any caching at CDN/edge level
